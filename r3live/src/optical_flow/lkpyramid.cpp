@@ -236,14 +236,14 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
         acctype iA11 = 0, iA12 = 0, iA22 = 0;
         float A11, A12, A22;
 
-// #if CV_SSE2
+#if CV_SSE2
         __m128i qw0 = _mm_set1_epi32(iw00 + (iw01 << 16));
         __m128i qw1 = _mm_set1_epi32(iw10 + (iw11 << 16));
         __m128i z = _mm_setzero_si128();
         __m128i qdelta_d = _mm_set1_epi32(1 << (W_BITS1 - 1));
         __m128i qdelta = _mm_set1_epi32(1 << (W_BITS1 - 5 - 1));
         __m128 qA11 = _mm_setzero_ps(), qA12 = _mm_setzero_ps(), qA22 = _mm_setzero_ps();
-// #endif
+#endif
 
         // extract the patch from the first image, compute covariation matrix of derivatives
         int x, y;
@@ -257,7 +257,7 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
 
             x = 0;
 
-            // #if CV_SSE2
+            #if CV_SSE2
             for (; x <= winSize.width * cn - 4; x += 4, dsrc += 4 * 2, dIptr += 4 * 2)
             {
                 __m128i v00, v01, v10, v11, t0, t1;
@@ -296,7 +296,7 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
                 qA12 = _mm_add_ps(qA12, _mm_mul_ps(fx, fy));
                 qA11 = _mm_add_ps(qA11, _mm_mul_ps(fx, fx));
             }
-            // #endif
+            #endif
             for (; x < winSize.width * cn; x++, dsrc += 2, dIptr += 2)
             {
                 int ival = CV_DESCALE(src[x] * iw00 + src[x + cn] * iw01 +
@@ -319,7 +319,7 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
             }
         }
 
-        // #if CV_SSE2
+        #if CV_SSE2
         float CV_DECL_ALIGNED(16) A11buf[4], A12buf[4], A22buf[4];
         _mm_store_ps(A11buf, qA11);
         _mm_store_ps(A12buf, qA12);
@@ -327,7 +327,7 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
         iA11 += A11buf[0] + A11buf[1] + A11buf[2] + A11buf[3];
         iA12 += A12buf[0] + A12buf[1] + A12buf[2] + A12buf[3];
         iA22 += A22buf[0] + A22buf[1] + A22buf[2] + A22buf[3];
-        // #endif
+        #endif
 
         A11 = iA11 * FLT_SCALE;
         A12 = iA12 * FLT_SCALE;
@@ -372,11 +372,11 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
             iw11 = (1 << W_BITS) - iw00 - iw01 - iw10;
             acctype ib1 = 0, ib2 = 0;
             float b1, b2;
-            // #if CV_SSE2
+            #if CV_SSE2
             qw0 = _mm_set1_epi32(iw00 + (iw01 << 16));
             qw1 = _mm_set1_epi32(iw10 + (iw11 << 16));
             __m128 qb0 = _mm_setzero_ps(), qb1 = _mm_setzero_ps();
-            // #endif
+            #endif
 
             for (y = 0; y < winSize.height; y++)
             {
@@ -384,7 +384,7 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
                 const deriv_type *Iptr = IWinBuf.ptr<deriv_type>(y);
                 const deriv_type *dIptr = derivIWinBuf.ptr<deriv_type>(y);
                 x = 0;
-                // #if CV_SSE2
+                #if CV_SSE2
                 for (; x <= winSize.width * cn - 8; x += 8, dIptr += 8 * 2)
                 {
                     __m128i diff0 = _mm_loadu_si128((const __m128i *)(Iptr + x)), diff1;
@@ -413,7 +413,7 @@ inline void calculate_LK_optical_flow(const cv::Range &range, const Mat *prevImg
                     qb0 = _mm_add_ps(qb0, _mm_cvtepi32_ps(v00));
                     qb1 = _mm_add_ps(qb1, _mm_cvtepi32_ps(v11));
                 }
-                // #endif
+                #endif
                 for (; x < winSize.width * cn; x++, dIptr += 2)
                 {
                     int diff = CV_DESCALE(Jptr[x] * iw00 + Jptr[x + cn] * iw01 +

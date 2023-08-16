@@ -15,7 +15,7 @@
 
 
 double g_lidar_star_tim = 0;
-ImuProcess::ImuProcess() : b_first_frame_( true ), imu_need_init_( true ), last_imu_( nullptr ), start_timestamp_( -1 )
+ImuProcess::ImuProcess() : Node("imu process node"), b_first_frame_( true ), imu_need_init_( true ), last_imu_( nullptr ), start_timestamp_( -1 )
 {
     Eigen::Quaterniond q( 0, 1, 0, 0 );
     Eigen::Vector3d    t( 0, 0, 0 );
@@ -36,7 +36,7 @@ ImuProcess::~ImuProcess()
 
 void ImuProcess::Reset()
 {
-    ROS_WARN( "Reset ImuProcess" );
+    RCLCPP_WARN(this->get_logger(), "Reset ImuProcess");
     angvel_last = Zero3d;
     cov_proc_noise = Eigen::Matrix< double, DIM_OF_PROC_N, 1 >::Zero();
 
@@ -63,7 +63,7 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
 {
     /** 1. initializing the gravity, gyro bias, acc and gyro covariance
      ** 2. normalize the acceleration measurenments to unit gravity **/
-    ROS_INFO( "IMU Initializing: %.1f %%", double( N ) / MAX_INI_COUNT * 100 );
+    RCLCPP_INFO(this->get_logger(), "IMU Initializing: %.1f %%", double(N) / MAX_INI_COUNT * 100);
     Eigen::Vector3d cur_acc, cur_gyr;
 
     if ( b_first_frame_ )
@@ -104,7 +104,7 @@ void ImuProcess::lic_state_propagate( const MeasureGroup &meas, StatesGroup &sta
     auto v_imu = meas.imu;
     v_imu.push_front( last_imu_ );
     // const double &imu_beg_time = v_imu.front()->header.stamp.toSec();
-    const double &imu_end_time = v_imu.back()->header.stamp.toSec();
+    const double &imu_end_time = Common_tools::toSec(v_imu.back()->header) ;
     const double &pcl_beg_time = meas.lidar_beg_time;
 
     /*** sort point clouds by offset time ***/
@@ -154,7 +154,7 @@ void check_in_out_state( const StatesGroup &state_in, StatesGroup &state_inout )
 
 std::mutex g_imu_premutex;
 
-StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::deque< sensor_msgs::Imu::ConstPtr > &v_imu, double end_pose_dt )
+StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::deque< sensor_msgs::msg::Imu::ConstPtr > &v_imu, double end_pose_dt )
 {
     std::unique_lock< std::mutex > lock( g_imu_premutex );
     StatesGroup                    state_inout = state_in;
@@ -176,14 +176,14 @@ StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::de
     //        v_imu.back()->header.stamp.toSec() - g_lidar_star_tim,
     //        state_in.last_update_time - g_lidar_star_tim,
     //        state_in.last_update_time - v_imu.front()->header.stamp.toSec());
-    for ( std::deque< sensor_msgs::Imu::ConstPtr >::iterator it_imu = v_imu.begin(); it_imu != ( v_imu.end() - 1 ); it_imu++ )
+    for ( std::deque< sensor_msgs::msg::Imu::ConstSharedPtr >::iterator it_imu = v_imu.begin(); it_imu != ( v_imu.end() - 1 ); it_imu++ )
     {
         // if(g_lidar_star_tim == 0 || state_inout.last_update_time == 0)
         // {
         //   return state_inout;
         // }
-        sensor_msgs::Imu::ConstPtr head = *( it_imu );
-        sensor_msgs::Imu::ConstPtr tail = *( it_imu + 1 );
+        sensor_msgs::msg::Imu::ConstSharedPtr head = *( it_imu );
+        sensor_msgs::msg::Imu::ConstSharedPtr tail = *( it_imu + 1 );
 
         angvel_avr << 0.5 * ( head->angular_velocity.x + tail->angular_velocity.x ), 0.5 * ( head->angular_velocity.y + tail->angular_velocity.y ),
             0.5 * ( head->angular_velocity.z + tail->angular_velocity.z );
@@ -194,7 +194,7 @@ StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::de
 
         acc_avr = acc_avr - state_inout.bias_a;
 
-        if ( tail->header.stamp.toSec() < state_inout.last_update_time )
+        if ( tail->header.stamp.sec < state_inout.last_update_time )
         {
             continue;
         }
@@ -202,11 +202,11 @@ StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::de
         if ( if_first_imu )
         {
             if_first_imu = 0;
-            dt = tail->header.stamp.toSec() - state_inout.last_update_time;
+            dt = Common_tools::toSec(tail->header) - state_inout.last_update_time;
         }
         else
         {
-            dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
+            dt = Common_tools::toSec(tail->header)- Common_tools::toSec(head->header);
         }
         if ( dt > 0.05 )
         {
@@ -268,7 +268,7 @@ StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::de
     /*** calculated the pos and attitude prediction at the frame-end ***/
     dt = end_pose_dt;
 
-    state_inout.last_update_time = v_imu.back()->header.stamp.toSec() + dt;
+    state_inout.last_update_time = Common_tools::toSec(v_imu.back()->header) + dt;
     // cout << "Last update time = " <<  state_inout.last_update_time - g_lidar_star_tim << endl;
     if ( dt > 0.1 )
     {
@@ -309,7 +309,7 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
     StatesGroup state_inout = _state_inout;
     auto        v_imu = meas.imu;
     v_imu.push_front( last_imu_ );
-    const double &imu_end_time = v_imu.back()->header.stamp.toSec();
+    const double &imu_end_time = Common_tools::toSec(v_imu.back()->header);
     const double &pcl_beg_time = meas.lidar_beg_time;
     /*** sort point clouds by offset time ***/
     pcl_out = *( meas.lidar );
@@ -346,7 +346,7 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
 #ifdef DEBUG_PRINT
 // fout<<head->header.stamp.toSec()<<" "<<angvel_avr.transpose()<<" "<<acc_avr.transpose()<<std::endl;
 #endif
-        dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
+        dt = Common_tools::toSec(tail->header) - Common_tools::toSec(head->header);
         /* covariance propagation */
 
         Eigen::Matrix3d acc_avr_skew;
@@ -371,7 +371,7 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
         /* save the poses at each IMU measurements */
         angvel_last = angvel_avr;
         acc_s_last = acc_imu;
-        double &&offs_t = tail->header.stamp.toSec() - pcl_beg_time;
+        double &&offs_t = Common_tools::toSec(tail->header) - pcl_beg_time;
         // std::cout<<"acc "<<acc_imu.transpose()<<"vel "<<acc_imu.transpose()<<"vel "<<pos_imu.transpose()<<std::endl;
         IMU_pose.push_back( set_pose6d( offs_t, acc_imu, angvel_avr, vel_imu, pos_imu, R_imu ) );
     }
@@ -438,7 +438,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
         // std::cout << "no imu data" << std::endl;
         return;
     };
-    ROS_ASSERT( meas.lidar != nullptr );
+    assert( meas.lidar != nullptr );
 
     if ( imu_need_init_ )
     {
@@ -453,7 +453,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
         {
             imu_need_init_ = false;
             // std::cout<<"mean acc: "<<mean_acc<<" acc measures in word frame:"<<state.rot_end.transpose()*mean_acc<<std::endl;
-            ROS_INFO(
+            RCLCPP_INFO( this->get_logger(),
                 "IMU Initials: Gravity: %.4f %.4f %.4f; state.bias_g: %.4f %.4f %.4f; acc covarience: %.8f %.8f %.8f; gry covarience: %.8f %.8f %.8f",
                 stat.gravity[ 0 ], stat.gravity[ 1 ], stat.gravity[ 2 ], stat.bias_g[ 0 ], stat.bias_g[ 1 ], stat.bias_g[ 2 ], cov_acc[ 0 ],
                 cov_acc[ 1 ], cov_acc[ 2 ], cov_gyr[ 0 ], cov_gyr[ 1 ], cov_gyr[ 2 ] );

@@ -59,6 +59,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <string>
 #include <thread>
 #include <iomanip>
+#include <memory>
 #include "tools_color_printf.hpp"
 #include "tools_timer.hpp"
 // #define FILE_LOGGER_VERSION      "V1.0"
@@ -93,7 +94,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
     std::cout << "=============================================================" << std::endl;                                                                                                         \
     std::cout << "App name   : " << ANSI_COLOR_WHITE_BOLD << a << ANSI_COLOR_YELLOW_BOLD << std::endl;                                                                                                 \
     std::cout << "Build date : " << __DATE__ << "  " << __TIME__ << std::endl;                                                                                                                         \
-    std::cout << "CPU infos  : " << Common_tools::get_cpu_info() << std::endl;                                                                                                                         \
+    // std::cout << "CPU infos  : " << Common_tools::get_cpu_info() << std::endl;                                                                                                                         \
     std::cout << "RAM infos  : " << Common_tools::get_RAM_info() << std::endl;                                                                                                                         \
     std::cout << "OS  infos  : " << Common_tools::get_OS_info() << std::endl;                                                                                                                          \
     std::cout << "Home dir   : " << Common_tools::get_home_folder() << std::endl;                                                                                                                      \
@@ -570,7 +571,7 @@ inline String get_application_folder()
     std::cout << "=============================================================" << std::endl;                                                                                                         \
     std::cout << "App name   : " << ANSI_COLOR_WHITE_BOLD << a << ANSI_COLOR_YELLOW_BOLD << std::endl;                                                                                                 \
     std::cout << "Build date : " << __DATE__ << "  " << __TIME__ << std::endl;                                                                                                                         \
-    std::cout << "CPU infos  : " << Common_tools::get_cpu_info() << std::endl;                                                                                                                         \
+    // std::cout << "CPU infos  : " << Common_tools::get_cpu_info() << std::endl;                                                                                                                         \
     std::cout << "RAM infos  : " << Common_tools::get_RAM_info() << std::endl;                                                                                                                         \
     std::cout << "OS  infos  : " << Common_tools::get_OS_info() << std::endl;                                                                                                                          \
     std::cout << "Home dir   : " << Common_tools::get_home_folder() << std::endl;                                                                                                                      \
@@ -1079,7 +1080,7 @@ inline CPUINFO GetCPUInfo_()
     return info;
 }
 
-#if 1
+#if 0
 inline String get_cpu_info()
 {
     const CPUINFO info( GetCPUInfo_() );
@@ -1316,82 +1317,82 @@ inline String get_current_folder()
     return ensureUnifySlash( dir );
 }
 
-#ifdef _MSC_VER
-#include <intrin.h>
-inline void CPUID( int CPUInfo[ 4 ], int level ) { __cpuid( CPUInfo, level ); }
-#else
-#include <cpuid.h>
-inline void CPUID( int CPUInfo[ 4 ], int level )
-{
-    unsigned *p( ( unsigned * ) CPUInfo );
-    __get_cpuid( ( unsigned & ) level, p + 0, p + 1, p + 2, p + 3 );
-}
-#endif
+// #ifdef _MSC_VER
+// #include <intrin.h>
+// inline void CPUID( int CPUInfo[ 4 ], int level ) { __cpuid( CPUInfo, level ); }
+// #else
+// #include <cpuid.h>
+// inline void CPUID( int CPUInfo[ 4 ], int level )
+// {
+//     unsigned *p( ( unsigned * ) CPUInfo );
+//     __get_cpuid( ( unsigned & ) level, p + 0, p + 1, p + 2, p + 3 );
+// }
+// #endif
 
-inline CPUINFO GetCPUInfo_()
-{
-    CPUINFO info;
+// inline CPUINFO GetCPUInfo_()
+// {
+//     CPUINFO info;
 
-    // set all values to 0 (false)
-    memset( &info, 0, sizeof( CPUINFO ) );
+//     // set all values to 0 (false)
+//     memset( &info, 0, sizeof( CPUINFO ) );
 
-    int CPUInfo[ 4 ];
+//     int CPUInfo[ 4 ];
 
-    // CPUID with an InfoType argument of 0 returns the number of
-    // valid Ids in CPUInfo[0] and the CPU identification string in
-    // the other three array elements. The CPU identification string is
-    // not in linear order. The code below arranges the information
-    // in a human readable form.
-    CPUID( CPUInfo, 0 );
-    *( ( int * ) info.vendor ) = CPUInfo[ 1 ];
-    *( ( int * ) ( info.vendor + 4 ) ) = CPUInfo[ 3 ];
-    *( ( int * ) ( info.vendor + 8 ) ) = CPUInfo[ 2 ];
+//     // CPUID with an InfoType argument of 0 returns the number of
+//     // valid Ids in CPUInfo[0] and the CPU identification string in
+//     // the other three array elements. The CPU identification string is
+//     // not in linear order. The code below arranges the information
+//     // in a human readable form.
+//     CPUID( CPUInfo, 0 );
+//     *( ( int * ) info.vendor ) = CPUInfo[ 1 ];
+//     *( ( int * ) ( info.vendor + 4 ) ) = CPUInfo[ 3 ];
+//     *( ( int * ) ( info.vendor + 8 ) ) = CPUInfo[ 2 ];
 
-    // Interpret CPU feature information.
-    CPUID( CPUInfo, 1 );
-    info.bMMX = ( CPUInfo[ 3 ] & 0x800000 ) != 0;            // test bit 23 for MMX
-    info.bSSE = ( CPUInfo[ 3 ] & 0x2000000 ) != 0;           // test bit 25 for SSE
-    info.bSSE2 = ( CPUInfo[ 3 ] & 0x4000000 ) != 0;          // test bit 26 for SSE2
-    info.bSSE3 = ( CPUInfo[ 2 ] & 0x1 ) != 0;                // test bit 0 for SSE3
-    info.bSSE41 = ( CPUInfo[ 2 ] & 0x80000 ) != 0;           // test bit 19 for SSE4.1
-    info.bSSE42 = ( CPUInfo[ 2 ] & 0x100000 ) != 0;          // test bit 20 for SSE4.2
-    info.bAVX = ( CPUInfo[ 2 ] & 0x18000000 ) == 0x18000000; // test bits 28,27 for AVX
-    info.bFMA = ( CPUInfo[ 2 ] & 0x18001000 ) == 0x18001000; // test bits 28,27,12 for FMA
+//     // Interpret CPU feature information.
+//     CPUID( CPUInfo, 1 );
+//     info.bMMX = ( CPUInfo[ 3 ] & 0x800000 ) != 0;            // test bit 23 for MMX
+//     info.bSSE = ( CPUInfo[ 3 ] & 0x2000000 ) != 0;           // test bit 25 for SSE
+//     info.bSSE2 = ( CPUInfo[ 3 ] & 0x4000000 ) != 0;          // test bit 26 for SSE2
+//     info.bSSE3 = ( CPUInfo[ 2 ] & 0x1 ) != 0;                // test bit 0 for SSE3
+//     info.bSSE41 = ( CPUInfo[ 2 ] & 0x80000 ) != 0;           // test bit 19 for SSE4.1
+//     info.bSSE42 = ( CPUInfo[ 2 ] & 0x100000 ) != 0;          // test bit 20 for SSE4.2
+//     info.bAVX = ( CPUInfo[ 2 ] & 0x18000000 ) == 0x18000000; // test bits 28,27 for AVX
+//     info.bFMA = ( CPUInfo[ 2 ] & 0x18001000 ) == 0x18001000; // test bits 28,27,12 for FMA
 
-    // EAX=0x80000000 => CPUID returns extended features
-    CPUID( CPUInfo, 0x80000000 );
-    const unsigned nExIds = CPUInfo[ 0 ];
-    info.bEXT = ( nExIds >= 0x80000000 );
+//     // EAX=0x80000000 => CPUID returns extended features
+//     CPUID( CPUInfo, 0x80000000 );
+//     const unsigned nExIds = CPUInfo[ 0 ];
+//     info.bEXT = ( nExIds >= 0x80000000 );
 
-    // must be greater than 0x80000004 to support CPU name
-    if ( nExIds > 0x80000004 )
-    {
-        size_t idx( 0 );
-        CPUID( CPUInfo, 0x80000002 ); // CPUID returns CPU name part1
-        while ( ( ( uint8_t * ) CPUInfo )[ idx ] == ' ' )
-            ++idx;
-        memcpy( info.name, ( uint8_t * ) CPUInfo + idx, sizeof( CPUInfo ) - idx );
-        idx = sizeof( CPUInfo ) - idx;
+//     // must be greater than 0x80000004 to support CPU name
+//     if ( nExIds > 0x80000004 )
+//     {
+//         size_t idx( 0 );
+//         CPUID( CPUInfo, 0x80000002 ); // CPUID returns CPU name part1
+//         while ( ( ( uint8_t * ) CPUInfo )[ idx ] == ' ' )
+//             ++idx;
+//         memcpy( info.name, ( uint8_t * ) CPUInfo + idx, sizeof( CPUInfo ) - idx );
+//         idx = sizeof( CPUInfo ) - idx;
 
-        CPUID( CPUInfo, 0x80000003 ); // CPUID returns CPU name part2
-        memcpy( info.name + idx, CPUInfo, sizeof( CPUInfo ) );
-        idx += 16;
+//         CPUID( CPUInfo, 0x80000003 ); // CPUID returns CPU name part2
+//         memcpy( info.name + idx, CPUInfo, sizeof( CPUInfo ) );
+//         idx += 16;
 
-        CPUID( CPUInfo, 0x80000004 ); // CPUID returns CPU name part3
-        memcpy( info.name + idx, CPUInfo, sizeof( CPUInfo ) );
-    }
+//         CPUID( CPUInfo, 0x80000004 ); // CPUID returns CPU name part3
+//         memcpy( info.name + idx, CPUInfo, sizeof( CPUInfo ) );
+//     }
 
-    if ( ( strncmp( info.vendor, "AuthenticAMD", 12 ) == 0 ) && info.bEXT )
-    {                                                       // AMD
-        CPUID( CPUInfo, 0x80000001 );                       // CPUID will copy ext. feat. bits to EDX and cpu type to EAX
-        info.b3DNOWEX = ( CPUInfo[ 3 ] & 0x40000000 ) != 0; // indicates AMD extended 3DNow+!
-        info.bMMXEX = ( CPUInfo[ 3 ] & 0x400000 ) != 0;     // indicates AMD extended MMX
-    }
+//     if ( ( strncmp( info.vendor, "AuthenticAMD", 12 ) == 0 ) && info.bEXT )
+//     {                                                       // AMD
+//         CPUID( CPUInfo, 0x80000001 );                       // CPUID will copy ext. feat. bits to EDX and cpu type to EAX
+//         info.b3DNOWEX = ( CPUInfo[ 3 ] & 0x40000000 ) != 0; // indicates AMD extended 3DNow+!
+//         info.bMMXEX = ( CPUInfo[ 3 ] & 0x400000 ) != 0;     // indicates AMD extended MMX
+//     }
 
-    return info;
-}
+//     return info;
+// }
 
-#if 1
+#if 0
 inline String get_cpu_info()
 {
     const CPUINFO info( GetCPUInfo_() );

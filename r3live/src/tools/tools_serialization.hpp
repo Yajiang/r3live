@@ -55,6 +55,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 // [3] https://github.com/cdcseacave/openMVS/blob/master/libs/Common/Types.inl 
 
 #include <boost/serialization/serialization.hpp>
+#include <boost/serialization/library_version_type.hpp>
 #include <boost/serialization/unordered_map.hpp>
 
 #include <boost/serialization/vector.hpp>

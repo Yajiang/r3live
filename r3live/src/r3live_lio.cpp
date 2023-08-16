@@ -46,16 +46,25 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  POSSIBILITY OF SUCH DAMAGE.
 */
 #include "r3live.hpp"
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2/transform_datatypes.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 
-void R3LIVE::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
+std::string R3LIVE::map_path = "";
+pcl::PointCloud<pcl::PointXYZI>::Ptr R3LIVE::cloud_map = nullptr;
+
+void R3LIVE::imu_cbk( const sensor_msgs::msg::Imu &msg_in )
 {
-    sensor_msgs::Imu::Ptr msg( new sensor_msgs::Imu( *msg_in ) );
-    double                timestamp = msg->header.stamp.toSec();
+    sensor_msgs::msg::Imu::SharedPtr msg( new sensor_msgs::msg::Imu( msg_in ) );
+    double timestamp = Common_tools::toSec (msg->header);
     g_camera_lidar_queue.imu_in( timestamp );
     mtx_buffer.lock();
     if ( timestamp < last_timestamp_imu )
     {
-        ROS_ERROR( "imu loop back, clear buffer" );
+        RCLCPP_ERROR(this->get_logger(), "imu loop back, clear buffer");
         imu_buffer_lio.clear();
         imu_buffer_vio.clear();
         flg_reset = true;
@@ -77,7 +86,7 @@ void R3LIVE::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
     sig_buffer.notify_all();
 }
 
-void printf_field_name( sensor_msgs::PointCloud2::ConstPtr &msg )
+void printf_field_name( sensor_msgs::msg::PointCloud2::ConstSharedPtr &msg )
 {
     cout << "Input pointcloud field names: [" << msg->fields.size() << "]: ";
     for ( size_t i = 0; i < msg->fields.size(); i++ )
@@ -88,7 +97,7 @@ void printf_field_name( sensor_msgs::PointCloud2::ConstPtr &msg )
 }
 
 
-bool R3LIVE::get_pointcloud_data_from_ros_message( sensor_msgs::PointCloud2::ConstPtr &msg, pcl::PointCloud< pcl::PointXYZINormal > &pcl_pc )
+bool R3LIVE::get_pointcloud_data_from_ros_message( sensor_msgs::msg::PointCloud2::ConstSharedPtr &msg, pcl::PointCloud< pcl::PointXYZINormal > &pcl_pc )
 {
 
     // printf("Frame [%d] %.3f ", g_LiDAR_frame_index,  msg->header.stamp.toSec() - g_camera_lidar_queue.m_first_imu_time);
@@ -113,10 +122,10 @@ bool R3LIVE::get_pointcloud_data_from_ros_message( sensor_msgs::PointCloud2::Con
         else if ( ( msg->fields.size() == 4 ) && ( msg->fields[ 3 ].name == "rgb" ) )
         {
             double maximum_range = 5;
-            get_ros_parameter< double >( m_ros_node_handle, "iros_range", maximum_range, 5 );
+            get_ros_parameter<double>(*this, "iros_range", maximum_range, 5);
             pcl::PointCloud< pcl::PointXYZRGB > pcl_rgb_pc;
             pcl::fromROSMsg( *msg, pcl_rgb_pc );
-            double lidar_point_time = msg->header.stamp.toSec();
+            double lidar_point_time = Common_tools::toSec(msg->header);
             int    pt_count = 0;
             pcl_pc.resize( pcl_rgb_pc.points.size() );
             for ( int i = 0; i < pcl_rgb_pc.size(); i++ )
@@ -164,7 +173,7 @@ bool R3LIVE::sync_packages( MeasureGroup &meas )
             return false;
         }
         // pcl::fromROSMsg(*(lidar_buffer.front()), *(meas.lidar));
-        meas.lidar_beg_time = lidar_buffer.front()->header.stamp.toSec();
+        meas.lidar_beg_time = Common_tools::toSec(lidar_buffer.front()->header);
         lidar_end_time = meas.lidar_beg_time + meas.lidar->points.back().curvature / double( 1000 );
         meas.lidar_end_time = lidar_end_time;
         // printf("Input LiDAR time = %.3f, %.3f\n", meas.lidar_beg_time, meas.lidar_end_time);
@@ -178,11 +187,11 @@ bool R3LIVE::sync_packages( MeasureGroup &meas )
     }
 
     /*** push imu data, and pop from imu buffer ***/
-    double imu_time = imu_buffer_lio.front()->header.stamp.toSec();
+    double imu_time = Common_tools::toSec(imu_buffer_lio.front()->header);
     meas.imu.clear();
     while ( ( !imu_buffer_lio.empty() ) && ( imu_time < lidar_end_time ) )
     {
-        imu_time = imu_buffer_lio.front()->header.stamp.toSec();
+        imu_time = Common_tools::toSec(imu_buffer_lio.front()->header);
         if ( imu_time > lidar_end_time + 0.02 )
             break;
         meas.imu.push_back( imu_buffer_lio.front() );
@@ -459,24 +468,23 @@ void R3LIVE::lasermap_fov_segment()
     // s_plot6.push_back(omp_get_wtime() - t_begin);
 }
 
-void R3LIVE::feat_points_cbk( const sensor_msgs::PointCloud2::ConstPtr &msg_in )
+void R3LIVE::feat_points_cbk( const sensor_msgs::msg::PointCloud2 &msg_in )
 {
-    sensor_msgs::PointCloud2::Ptr msg( new sensor_msgs::PointCloud2( *msg_in ) );
-    msg->header.stamp = ros::Time( msg_in->header.stamp.toSec() - m_lidar_imu_time_delay );
-    if ( g_camera_lidar_queue.lidar_in( msg_in->header.stamp.toSec() + 0.1 ) == 0 )
+    sensor_msgs::msg::PointCloud2::SharedPtr msg( new sensor_msgs::msg::PointCloud2( msg_in ) );
+    msg->header.stamp = rclcpp::Time( static_cast<uint64_t> ((Common_tools::toSec(msg_in.header) - m_lidar_imu_time_delay)*1e9) );
+    if ( g_camera_lidar_queue.lidar_in( Common_tools::toSec(msg_in.header) + 0.1 ) == 0 )
     {
         return;
     }
     mtx_buffer.lock();
     // std::cout<<"got feature"<<std::endl;
-    if ( msg->header.stamp.toSec() < last_timestamp_lidar )
+    if (Common_tools::toSec (msg->header)  < last_timestamp_lidar)
     {
-        ROS_ERROR( "lidar loop back, clear buffer" );
+        RCLCPP_ERROR(this->get_logger(), "lidar loop back, clear buffer" );
         lidar_buffer.clear();
     }
-    // ROS_INFO("get point cloud at time: %.6f", msg->header.stamp.toSec());
     lidar_buffer.push_back( msg );
-    last_timestamp_lidar = msg->header.stamp.toSec();
+    last_timestamp_lidar = Common_tools::toSec(msg->header);
     mtx_buffer.unlock();
     sig_buffer.notify_all();
 }
@@ -492,8 +500,8 @@ void R3LIVE::wait_render_thread_finish()
 
 int R3LIVE::service_LIO_update()
 {
-    nav_msgs::Path path;
-    path.header.stamp = ros::Time::now();
+    nav_msgs::msg::Path path;
+    path.header.stamp = this->now();
     path.header.frame_id = "/world";
     /*** variables definition ***/
     Eigen::Matrix< double, DIM_OF_STATES, DIM_OF_STATES > G, H_T_H, I_STATE;
@@ -523,19 +531,19 @@ int R3LIVE::service_LIO_update()
     std::shared_ptr< ImuProcess > p_imu( new ImuProcess() );
     m_imu_process = p_imu;
     //------------------------------------------------------------------------------------------------------
-    ros::Rate rate( 5000 );
-    bool      status = ros::ok();
+    rclcpp::Rate rate( 5000 );
+    bool      status = rclcpp::ok() ;
     g_camera_lidar_queue.m_liar_frame_buf = &lidar_buffer;
     set_initial_state_cov( g_lio_state );
-    while ( ros::ok() )
+    while ( rclcpp::ok() )
     {
         if ( flg_exit )
             break;
-        ros::spinOnce();
+        rclcpp::spin_some(this->get_node_base_interface());
         std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
         while ( g_camera_lidar_queue.if_lidar_can_process() == false )
         {
-            ros::spinOnce();
+            rclcpp::spin_some(this->get_node_base_interface());
             std::this_thread::yield();
             std::this_thread::sleep_for( std::chrono::milliseconds( THREAD_SLEEP_TIM ) );
         }
@@ -544,7 +552,7 @@ int R3LIVE::service_LIO_update()
         {
             // printf_line;
             Common_tools::Timer tim;
-            if ( sync_packages( Measures ) == 0 )
+            if ( sync_packages( Measures ) == 0)
             {
                 continue;
             }
@@ -552,7 +560,7 @@ int R3LIVE::service_LIO_update()
             g_lidar_star_tim = frame_first_pt_time;
             if ( flg_reset )
             {
-                ROS_WARN( "reset when rosbag play back" );
+                RCLCPP_WARN(this->get_logger(),"reset when rosbag play back");
                 p_imu->Reset();
                 flg_reset = false;
                 continue;
@@ -638,12 +646,12 @@ int R3LIVE::service_LIO_update()
                     featsFromMap->clear();
                     featsFromMap->points = ikdtree.PCL_Storage;
 
-                    sensor_msgs::PointCloud2 laserCloudMap;
+                    sensor_msgs::msg::PointCloud2 laserCloudMap;
                     pcl::toROSMsg( *featsFromMap, laserCloudMap );
-                    laserCloudMap.header.stamp = ros::Time::now(); // ros::Time().fromSec(last_timestamp_lidar);
+                    laserCloudMap.header.stamp = rclcpp::Time(static_cast<uint64_t>(Measures.lidar_end_time * 1e9)); // ros::Time().fromSec(last_timestamp_lidar);
                     // laserCloudMap.header.stamp.fromSec(Measures.lidar_end_time); // ros::Time().fromSec(last_timestamp_lidar);
                     laserCloudMap.header.frame_id = "world";
-                    pubLaserCloudMap.publish( laserCloudMap );
+                    pubLaserCloudMap->publish( laserCloudMap );
                 }
 
                 std::vector< bool >               point_selected_surf( feats_down_size, true );
@@ -956,12 +964,12 @@ int R3LIVE::service_LIO_update()
                     RGBpointBodyToWorld( &laserCloudFullRes2->points[ i ], &temp_point );
                     laserCloudFullResColor->push_back( temp_point );
                 }
-                sensor_msgs::PointCloud2 laserCloudFullRes3;
+                sensor_msgs::msg::PointCloud2 laserCloudFullRes3;
                 pcl::toROSMsg( *laserCloudFullResColor, laserCloudFullRes3 );
-                // laserCloudFullRes3.header.stamp = ros::Time::now(); //.fromSec(last_timestamp_lidar);
-                laserCloudFullRes3.header.stamp.fromSec( Measures.lidar_end_time );
+                laserCloudFullRes3.header.stamp = rclcpp::Time(static_cast<uint64_t>(Measures.lidar_end_time * 1e9));
                 laserCloudFullRes3.header.frame_id = "world"; // world; camera_init
-                pubLaserCloudFullRes.publish( laserCloudFullRes3 );
+                pubLaserCloudFullRes->publish(laserCloudFullRes3);
+                *cloud_map += *laserCloudFullResColor;
             }
 
             if ( g_camera_lidar_queue.m_if_have_camera_data || (g_LiDAR_frame_index < 100) ) // append point cloud to global map.
@@ -1000,57 +1008,60 @@ int R3LIVE::service_LIO_update()
                     RGBpointBodyToWorld( &laserCloudOri->points[ i ], &temp_point );
                     laserCloudFullResColor->push_back( temp_point );
                 }
-                sensor_msgs::PointCloud2 laserCloudFullRes3;
+                sensor_msgs::msg::PointCloud2 laserCloudFullRes3;
                 pcl::toROSMsg( *laserCloudFullResColor, laserCloudFullRes3 );
-                // laserCloudFullRes3.header.stamp = ros::Time::now(); //.fromSec(last_timestamp_lidar);
-                laserCloudFullRes3.header.stamp.fromSec( Measures.lidar_end_time ); //.fromSec(last_timestamp_lidar);
+                laserCloudFullRes3.header.stamp = rclcpp::Time(static_cast<uint64_t>(Measures.lidar_end_time * 1e9)); //.fromSec(last_timestamp_lidar);
                 laserCloudFullRes3.header.frame_id = "world";
-                pubLaserCloudEffect.publish( laserCloudFullRes3 );
+                pubLaserCloudEffect->publish( laserCloudFullRes3 );
             }
 
             /******* Publish Maps:  *******/
-            sensor_msgs::PointCloud2 laserCloudMap;
+            sensor_msgs::msg::PointCloud2 laserCloudMap;
             pcl::toROSMsg( *featsFromMap, laserCloudMap );
-            laserCloudMap.header.stamp.fromSec( Measures.lidar_end_time ); // ros::Time().fromSec(last_timestamp_lidar);
+            laserCloudMap.header.stamp = rclcpp::Time(static_cast<uint64_t>(Measures.lidar_end_time * 1e9)); // ros::Time().fromSec(last_timestamp_lidar);
             laserCloudMap.header.frame_id = "world";
-            pubLaserCloudMap.publish( laserCloudMap );
+            pubLaserCloudMap->publish( laserCloudMap );
+
+            tf2::Quaternion geoQuat;
 
             /******* Publish Odometry ******/
-            geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw( euler_cur( 0 ), euler_cur( 1 ), euler_cur( 2 ) );
+            geoQuat.setRPY(euler_cur( 0 ), euler_cur( 1 ), euler_cur( 2 )) ;
             odomAftMapped.header.frame_id = "world";
             odomAftMapped.child_frame_id = "/aft_mapped";
-            odomAftMapped.header.stamp = ros::Time::now(); // ros::Time().fromSec(last_timestamp_lidar);
-            odomAftMapped.pose.pose.orientation.x = geoQuat.x;
-            odomAftMapped.pose.pose.orientation.y = geoQuat.y;
-            odomAftMapped.pose.pose.orientation.z = geoQuat.z;
-            odomAftMapped.pose.pose.orientation.w = geoQuat.w;
+            odomAftMapped.header.stamp = rclcpp::Time(static_cast<uint64_t>(Measures.lidar_end_time * 1e9)) ; // ros::Time().fromSec(last_timestamp_lidar);
+            odomAftMapped.pose.pose.orientation.x = geoQuat.x();
+            odomAftMapped.pose.pose.orientation.y = geoQuat.y();
+            odomAftMapped.pose.pose.orientation.z = geoQuat.z();
+            odomAftMapped.pose.pose.orientation.w = geoQuat.w();
             odomAftMapped.pose.pose.position.x = g_lio_state.pos_end( 0 );
             odomAftMapped.pose.pose.position.y = g_lio_state.pos_end( 1 );
             odomAftMapped.pose.pose.position.z = g_lio_state.pos_end( 2 );
 
-            pubOdomAftMapped.publish( odomAftMapped );
+            pubOdomAftMapped->publish( odomAftMapped );
 
-            static tf::TransformBroadcaster br;
-            tf::Transform                   transform;
-            tf::Quaternion                  q;
-            transform.setOrigin(
-                tf::Vector3( odomAftMapped.pose.pose.position.x, odomAftMapped.pose.pose.position.y, odomAftMapped.pose.pose.position.z ) );
-            q.setW( odomAftMapped.pose.pose.orientation.w );
-            q.setX( odomAftMapped.pose.pose.orientation.x );
-            q.setY( odomAftMapped.pose.pose.orientation.y );
-            q.setZ( odomAftMapped.pose.pose.orientation.z );
-            transform.setRotation( q );
-            br.sendTransform( tf::StampedTransform( transform, ros::Time().fromSec( Measures.lidar_end_time ), "world", "/aft_mapped" ) );
+            // static tf2_ros::TransformBroadcaster br;
+            // tf2::Transform transform;
+            // tf2::Quaternion q;
+            // transform.setOrigin(
+            //     tf2::Vector3( odomAftMapped.pose.pose.position.x, odomAftMapped.pose.pose.position.y, odomAftMapped.pose.pose.position.z ));
+            // q.setW( odomAftMapped.pose.pose.orientation.w );
+            // q.setX( odomAftMapped.pose.pose.orientation.x );
+            // q.setY( odomAftMapped.pose.pose.orientation.y );
+            // q.setZ( odomAftMapped.pose.pose.orientation.z );
+            // transform.setRotation( q );
+            // br.sendTransform(tf2::Stamped<Quaternion>( transform,ros::Time::fromSec( Measures.lidar_end_time ), "world", "/aft_mapped" ) );
+            // auto stamped_transform = geometry_msgs::msg::TransformStamped(transform, rclcpp::Time(static_cast<uint64_t> (Measures.lidar_end_time*1e9)), "world", "/aft_mapped");
+            // br.sendTransform()
 
-            msg_body_pose.header.stamp = ros::Time::now();
+            msg_body_pose.header.stamp = this->now();
             msg_body_pose.header.frame_id = "/camera_odom_frame";
             msg_body_pose.pose.position.x = g_lio_state.pos_end( 0 );
             msg_body_pose.pose.position.y = g_lio_state.pos_end( 1 );
             msg_body_pose.pose.position.z = g_lio_state.pos_end( 2 );
-            msg_body_pose.pose.orientation.x = geoQuat.x;
-            msg_body_pose.pose.orientation.y = geoQuat.y;
-            msg_body_pose.pose.orientation.z = geoQuat.z;
-            msg_body_pose.pose.orientation.w = geoQuat.w;
+            msg_body_pose.pose.orientation.x = geoQuat.x();
+            msg_body_pose.pose.orientation.y = geoQuat.y();
+            msg_body_pose.pose.orientation.z = geoQuat.z();
+            msg_body_pose.pose.orientation.w = geoQuat.w();
 
             /******* Publish Path ********/
             msg_body_pose.header.frame_id = "world";
@@ -1058,8 +1069,8 @@ int R3LIVE::service_LIO_update()
             {
                 path.poses.push_back( msg_body_pose );
             }
-            pubPath.publish( path );
-            
+            pubPath->publish( path );
+
             /*** save debug variables ***/
             frame_num++;
             aver_time_consu = aver_time_consu * ( frame_num - 1 ) / frame_num + ( t5 - t0 ) / frame_num;
@@ -1075,7 +1086,7 @@ int R3LIVE::service_LIO_update()
             fprintf( m_lio_costtime_fp, "%.5f %.5f\r\n", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time, t5 - t0 );
             fflush( m_lio_costtime_fp );
         }
-        status = ros::ok();
+        status = rclcpp::ok();
         rate.sleep();
     }
     return 0;

@@ -4,7 +4,7 @@
     <param name="IMU_topic" type="string" value= "/livox/imu" />
     <param name="Image_topic" type="string" value= "/camera/image_color" />
     <param name="r3live_common/map_output_dir" type="string" value="$(env HOME)/r3live_output" />
-    <rosparam command="load" file="$(find r3live)/../config/r3live_config.yaml" />
+    <ros2param command="load" file="$(find r3live)/../config/r3live_config.yaml" />
 
     <node pkg="r3live" type="r3live_LiDAR_front_end" name="r3live_LiDAR_front_end"  output="screen" required="true"/>
     <node pkg="r3live" type="r3live_mapping" name="r3live_mapping" output="screen" required="true" />

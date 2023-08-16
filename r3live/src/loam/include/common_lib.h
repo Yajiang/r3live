@@ -5,15 +5,11 @@
 #include <Eigen/Eigen>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/PointCloud.h>
-#include <nav_msgs/Odometry.h>
-#include <rosbag/bag.h>
+#include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/msg/point_cloud.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
-#include <tf/transform_broadcaster.h>
-#include <eigen_conversions/eigen_msg.h>
 #include "tools_color_printf.hpp"
 #include "tools_eigen.hpp"
 #include "tools_ros.hpp"
@@ -153,7 +149,7 @@ struct Camera_Lidar_queue
     int m_if_dump_log = 1;
 
     // std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> *m_camera_frame_buf = nullptr;
-    std::deque<sensor_msgs::PointCloud2::ConstPtr> *m_liar_frame_buf = nullptr;
+    std::deque<sensor_msgs::msg::PointCloud2::ConstSharedPtr> *m_liar_frame_buf = nullptr;
 
     double time_wrt_first_imu_time(double & time)
     {
@@ -209,13 +205,10 @@ struct Camera_Lidar_queue
     {
         if (m_liar_frame_buf != nullptr && m_liar_frame_buf->size())
         {
-            m_last_lidar_time = m_liar_frame_buf->front()->header.stamp.toSec() + 0.1;
+            m_last_lidar_time = Common_tools::toSec(m_liar_frame_buf->front()->header) + 0.1;
             return m_last_lidar_time;
         }
-        else
-        {
-            return -3e88;
-        }
+        return -3e88;
     }
 
     double get_camera_front_time()
@@ -304,7 +297,7 @@ struct MeasureGroup // Lidar data and imu dates for the curent process
     double lidar_beg_time;
     double lidar_end_time;
     PointCloudXYZINormal::Ptr lidar;
-    std::deque<sensor_msgs::Imu::ConstPtr> imu;
+    std::deque<sensor_msgs::msg::Imu::ConstSharedPtr> imu;
 };
 
 struct StatesGroup

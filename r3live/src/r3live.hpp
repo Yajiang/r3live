@@ -54,26 +54,28 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <csignal>
 #include <unistd.h>
 #include <so3_math.h>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp/parameter_service.hpp>
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 #include <common_lib.h>
 #include <kd_tree/ikd_Tree.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
 #include <opencv2/core/eigen.hpp>
-#include <visualization_msgs/Marker.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/io/pcd_io.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <tf/transform_datatypes.h>
-#include <tf/transform_broadcaster.h>
+#include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
+#include <functional>
 
-#include <geometry_msgs/Vector3.h>
 #include <FOV_Checker/FOV_Checker.h>
 
 #include <opencv2/highgui/highgui.hpp>
@@ -95,6 +97,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include "image_frame.hpp"
 #include "pointcloud_rgbd.hpp"
 #include "rgbmap_tracker.hpp"
+#include "yaml-cpp/yaml.h"
 
 #define THREAD_SLEEP_TIM 1
 
@@ -121,10 +124,9 @@ extern double g_vio_frame_cost_time;
 extern double g_lio_frame_cost_time;
 void dump_lio_state_to_log(FILE *fp);
 
-
 extern Common_tools::Cost_time_logger g_cost_time_logger;
 extern std::shared_ptr<Common_tools::ThreadPool> m_thread_pool_ptr;
-class R3LIVE
+class R3LIVE : public rclcpp::Node
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -172,9 +174,9 @@ public:
     double copy_time, readd_time, fov_check_time, readd_box_time, delete_box_time;
     double kdtree_incremental_time, kdtree_search_time;
 
-    std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
-    std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_lio;
-    std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_vio;
+    std::deque<sensor_msgs::msg::PointCloud2::ConstSharedPtr> lidar_buffer;
+    std::deque<sensor_msgs::msg::Imu::ConstSharedPtr> imu_buffer_lio;
+    std::deque<sensor_msgs::msg::Imu::ConstSharedPtr> imu_buffer_vio;
 
     //surf feature in map
     PointCloudXYZINormal::Ptr featsFromMap;     
@@ -197,23 +199,26 @@ public:
 
     KD_TREE ikdtree;
 
-    ros::Publisher pubLaserCloudFullRes;
-    ros::Publisher pubLaserCloudEffect;
-    ros::Publisher pubLaserCloudMap;
-    ros::Publisher pubOdomAftMapped;
-    ros::Publisher pubPath;
-    ros::Subscriber sub_pcl;
-    ros::Subscriber sub_imu;
-    ros::Subscriber sub_img, sub_img_comp;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFullRes;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudEffect;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudMap;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdomAftMapped;
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pubPath;
 
-    ros::Publisher pub_track_img, pub_raw_img;
-    ros::Publisher pub_odom_cam, pub_path_cam;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_pcl;
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_imu;
+    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_img;
+    rclcpp::Subscription<sensor_msgs::msg::CompressedImage>::SharedPtr sub_img_comp;
+
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pub_track_img, pub_raw_img;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odom_cam;
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pub_path_cam;
     bool dense_map_en, flg_EKF_inited = 0, flg_map_initialized = 0, flg_EKF_converged = 0;
     int effect_feat_num = 0, frame_num = 0;
     double filter_size_corner_min, m_voxel_downsample_size_surf, filter_size_map_min, fov_deg, deltaT, deltaR, aver_time_consu = 0, frame_first_pt_time = 0;
     double m_voxel_downsample_size_axis_z;
-    geometry_msgs::PoseStamped msg_body_pose;
-    nav_msgs::Odometry odomAftMapped;
+    geometry_msgs::msg::PoseStamped msg_body_pose;
+    nav_msgs::msg::Odometry odomAftMapped;
     PointType pointOri, pointSel, coeff;
     pcl::VoxelGrid<PointType> downSizeFilterSurf;
     pcl::VoxelGrid<PointType> downSizeFilterMap;
@@ -223,15 +228,15 @@ public:
 
     /*** debug record ***/
     // R3LIVE() = delete;
-    ros::NodeHandle             m_ros_node_handle;
+    // rclcpp::Node m_ros_node_handle;
 
     // ANCHOR - camera measurement related.
-    ros::Publisher m_pub_visual_tracked_3d_pts;
-    ros::Publisher m_pub_render_rgb_pts;
-    std::vector< std::shared_ptr <ros::Publisher> > m_pub_rgb_render_pointcloud_ptr_vec;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_pub_visual_tracked_3d_pts;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_pub_render_rgb_pts;
+    std::vector< rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr> m_pub_rgb_render_pointcloud_ptr_vec;
     std::mutex m_camera_data_mutex;
     double m_camera_start_ros_tim = -3e8;
-    std::deque<sensor_msgs::ImageConstPtr> m_queue_image_msg;
+    std::deque<sensor_msgs::msg::Image::ConstSharedPtr> m_queue_image_msg;
     std::deque<std::shared_ptr<Image_frame>> m_queue_image_with_pose;
     std::list<std::shared_ptr<Image_frame>> g_image_vec;
     Eigen::Matrix3d g_cam_K;
@@ -249,8 +254,8 @@ public:
     int m_maximum_image_buffer = 2;
     int m_track_windows_size = 50;
     double m_minumum_rgb_pts_size = 0.05;
-    double m_vio_image_width = 0;
-    double m_vio_image_heigh = 0;
+    int m_vio_image_width = 0;
+    int m_vio_image_heigh = 0;
     int m_if_estimate_i2c_extrinsic = 1;
     int m_if_estimate_intrinsic = 1;
     double m_control_image_freq =  100; 
@@ -272,8 +277,8 @@ public:
     Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m_camera_ext_R;
     Eigen::Matrix<double, 3, 1> m_camera_ext_t;
 
-    double m_image_downsample_ratio = 1.0;
-    nav_msgs::Path camera_path;
+    int m_image_downsample_ratio = 1;
+    nav_msgs::msg::Path camera_path;
     double m_cam_measurement_weight =  1e-3;
     int m_if_pub_raw_img = 1;
     int esikf_iter_times = 2;
@@ -290,8 +295,8 @@ public:
                                           double * imu_camera_ext_t ,
                                           double cam_k_scale);
     void process_image(cv::Mat & image, double msg_time);
-    void image_callback(const sensor_msgs::ImageConstPtr &msg);
-    void image_comp_callback(const sensor_msgs::CompressedImageConstPtr &msg);
+    void image_callback(const sensor_msgs::msg::Image &msg);
+    void image_comp_callback(const sensor_msgs::msg::CompressedImage &msg);
     void set_image_pose( std::shared_ptr<Image_frame> & image_pose, const StatesGroup & state );
     void publish_camera_odom(std::shared_ptr<Image_frame> & image, double msg_time);
     void publish_track_img(cv::Mat & img, double frame_cost_time);
@@ -308,29 +313,37 @@ public:
     cv::Mat generate_control_panel_img();
     // ANCHOR -  service_pub_rgb_maps
     
-    void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in);
+    void imu_cbk(const sensor_msgs::msg::Imu &msg_in);
 
     bool sync_packages(MeasureGroup &meas);
-    
-    R3LIVE()
-    {
-        pubLaserCloudFullRes = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_registered", 100);
-        pubLaserCloudEffect = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/cloud_effected", 100);
-        pubLaserCloudMap = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/Laser_map", 100);
-        pubOdomAftMapped = m_ros_node_handle.advertise<nav_msgs::Odometry>("/aft_mapped_to_init", 10);
-        pub_track_img = m_ros_node_handle.advertise<sensor_msgs::Image>("/track_img",1000);
-        pub_raw_img = m_ros_node_handle.advertise<sensor_msgs::Image>("/raw_in_img",1000);
-        m_pub_visual_tracked_3d_pts = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/track_pts", 10);
-        m_pub_render_rgb_pts = m_ros_node_handle.advertise<sensor_msgs::PointCloud2>("/render_pts", 10);
-        pubPath = m_ros_node_handle.advertise<nav_msgs::Path>("/path", 10);
 
-        pub_odom_cam = m_ros_node_handle.advertise<nav_msgs::Odometry>("/camera_odom", 10);
-        pub_path_cam = m_ros_node_handle.advertise<nav_msgs::Path>("/camera_path", 10);
+    static void exit_save_pcd();
+
+    void save_pcd_without_color();
+
+    static std::string map_path;
+    static pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_map;
+
+    R3LIVE() : Node("r3live_mapping",rclcpp::NodeOptions().allow_undeclared_parameters(true).automatically_declare_parameters_from_overrides(true))
+    {
+        pubLaserCloudFullRes = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 100);
+        pubLaserCloudEffect = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_effected", 100);
+        pubLaserCloudMap = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", 100);
+        pubOdomAftMapped = this->create_publisher<nav_msgs::msg::Odometry>("/aft_mapped_to_init", 10);
+        pub_track_img = this->create_publisher<sensor_msgs::msg::Image>("/track_img",1000);
+        pub_raw_img = this->create_publisher<sensor_msgs::msg::Image>("/raw_in_img",1000);
+        m_pub_visual_tracked_3d_pts = this->create_publisher<sensor_msgs::msg::PointCloud2>("/track_pts", 10);
+        m_pub_render_rgb_pts = this->create_publisher<sensor_msgs::msg::PointCloud2>("/render_pts", 10);
+        pubPath = this->create_publisher<nav_msgs::msg::Path>("/path", 10);
+
+        pub_odom_cam = this->create_publisher<nav_msgs::msg::Odometry>("/camera_odom", 10);
+        pub_path_cam = this->create_publisher<nav_msgs::msg::Path>("/camera_path", 10);
         std::string LiDAR_pointcloud_topic, IMU_topic, IMAGE_topic, IMAGE_topic_compressed;
 
-        get_ros_parameter<std::string>(m_ros_node_handle, "/LiDAR_pointcloud_topic", LiDAR_pointcloud_topic, std::string("/laser_cloud_flat") );
-        get_ros_parameter<std::string>(m_ros_node_handle, "/IMU_topic", IMU_topic, std::string("/livox/imu") );
-        get_ros_parameter<std::string>(m_ros_node_handle, "/Image_topic", IMAGE_topic, std::string("/camera/image_color") );
+        this->get_parameter_or("/LiDAR_pointcloud_topic", LiDAR_pointcloud_topic, std::string("/laser_cloud_flat") );
+        this->get_parameter_or("/IMU_topic", IMU_topic, std::string("/livox/imu") );
+        this->get_parameter_or("/Image_topic", IMAGE_topic, std::string("/camera/image_raw"));
+
         IMAGE_topic_compressed = std::string(IMAGE_topic).append("/compressed");
         if(1)
         {
@@ -340,57 +353,57 @@ public:
             cout << "IMU topic: " << IMU_topic << endl;
             cout << "Image topic: " << IMAGE_topic << endl;
             cout << "Image compressed topic: " << IMAGE_topic << endl;
-             cout << "=======        -End-                =======" << endl;
+            cout << "=======        -End-                =======" << endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        sub_imu = m_ros_node_handle.subscribe(IMU_topic.c_str(), 2000000, &R3LIVE::imu_cbk, this, ros::TransportHints().tcpNoDelay());
-        sub_pcl = m_ros_node_handle.subscribe(LiDAR_pointcloud_topic.c_str(), 2000000, &R3LIVE::feat_points_cbk, this, ros::TransportHints().tcpNoDelay());
-        sub_img = m_ros_node_handle.subscribe(IMAGE_topic.c_str(), 1000000, &R3LIVE::image_callback, this, ros::TransportHints().tcpNoDelay());
-        sub_img_comp = m_ros_node_handle.subscribe(IMAGE_topic_compressed.c_str(), 1000000, &R3LIVE::image_comp_callback, this, ros::TransportHints().tcpNoDelay());
+        sub_imu = this->create_subscription<sensor_msgs::msg::Imu> (IMU_topic.c_str(), 2000000, std::bind(&R3LIVE::imu_cbk, this,std::placeholders::_1) );
+        sub_pcl = this->create_subscription<sensor_msgs::msg::PointCloud2>(LiDAR_pointcloud_topic.c_str(), 2000000, std::bind(&R3LIVE::feat_points_cbk, this,std::placeholders::_1));
+        sub_img = this->create_subscription<sensor_msgs::msg::Image> (IMAGE_topic.c_str(), 1000000, std::bind(&R3LIVE::image_callback, this, std::placeholders::_1));
+        sub_img_comp = this->create_subscription<sensor_msgs::msg::CompressedImage> (IMAGE_topic_compressed.c_str(), 1000000, std::bind(&R3LIVE::image_comp_callback, this,std::placeholders::_1) );
 
-        m_ros_node_handle.getParam("/initial_pose", m_initial_pose);
+        this->get_parameter("/initial_pose", m_initial_pose);
         m_pub_rgb_render_pointcloud_ptr_vec.resize(1e3);
         // ANCHOR - ROS parameters
         if ( 1 )
         {
             scope_color( ANSI_COLOR_RED );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/map_output_dir", m_map_output_dir,
-                               Common_tools::get_home_folder().append( "/r3live_output" ) );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/append_global_map_point_step", m_append_global_map_point_step, 4 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/recent_visited_voxel_activated_time", m_recent_visited_voxel_activated_time, 0.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/maximum_image_buffer", m_maximum_image_buffer, 20000 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_minimum_depth", m_tracker_minimum_depth, 0.1 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_maximum_depth", m_tracker_maximum_depth, 200.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/track_windows_size", m_track_windows_size, 40 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/minimum_pts_size", m_minumum_rgb_pts_size, 0.05 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/record_offline_map", m_if_record_mvs, 0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/pub_pt_minimum_views", m_pub_pt_minimum_views, 5 );
+            get_ros_parameter(*this, "r3live_common.map_output_dir", m_map_output_dir,
+                              Common_tools::get_home_folder().append("/r3live_output"));
+            get_ros_parameter( *this, "r3live_common.append_global_map_point_step", m_append_global_map_point_step, 4 );
+            get_ros_parameter( *this, "r3live_common.recent_visited_voxel_activated_time", m_recent_visited_voxel_activated_time, 5.0 );
+            get_ros_parameter( *this, "r3live_common.maximum_image_buffer", m_maximum_image_buffer, 20000 );
+            get_ros_parameter( *this, "r3live_common.tracker_minimum_depth", m_tracker_minimum_depth, 0.1 );
+            get_ros_parameter( *this, "r3live_common.tracker_maximum_depth", m_tracker_maximum_depth, 200.0 );
+            get_ros_parameter( *this, "r3live_common.track_windows_size", m_track_windows_size, 40 );
+            get_ros_parameter( *this, "r3live_common.minimum_pts_size", m_minumum_rgb_pts_size, 0.05 );
+            get_ros_parameter( *this, "r3live_common.record_offline_map", m_if_record_mvs, 0 );
+            get_ros_parameter( *this, "r3live_common.pub_pt_minimum_views", m_pub_pt_minimum_views, 5 );
 
-            get_ros_parameter( m_ros_node_handle, "r3live_common/image_downsample_ratio", m_image_downsample_ratio, 1.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/esikf_iter_times", esikf_iter_times, 2 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/estimate_i2c_extrinsic", m_if_estimate_i2c_extrinsic, 0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/estimate_intrinsic", m_if_estimate_intrinsic, 0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/maximum_vio_tracked_pts", m_maximum_vio_tracked_pts, 600 );
+            get_ros_parameter( *this, "r3live_common.image_downsample_ratio", m_image_downsample_ratio, 1 );
+            get_ros_parameter( *this, "r3live_common.esikf_iter_times", esikf_iter_times, 2 );
+            get_ros_parameter( *this, "r3live_common.estimate_i2c_extrinsic", m_if_estimate_i2c_extrinsic, 0 );
+            get_ros_parameter( *this, "r3live_common.estimate_intrinsic", m_if_estimate_intrinsic, 0 );
+            get_ros_parameter( *this, "r3live_common.maximum_vio_tracked_pts", m_maximum_vio_tracked_pts, 600 );
         }
         if ( 1 )
         {
             scope_color( ANSI_COLOR_GREEN );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/dense_map_enable", dense_map_en, true );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/lidar_time_delay", m_lidar_imu_time_delay, 0.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/max_iteration", NUM_MAX_ITERATIONS, 4 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/fov_degree", fov_deg, 360.00 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/voxel_downsample_size_surf", m_voxel_downsample_size_surf, 0.3 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/voxel_downsample_size_axis_z", m_voxel_downsample_size_axis_z,
+            get_ros_parameter( *this, "r3live_lio.dense_map_enable", dense_map_en, true );
+            get_ros_parameter( *this, "r3live_lio.lidar_time_delay", m_lidar_imu_time_delay, 0.0 );
+            get_ros_parameter( *this, "r3live_lio.max_iteration", NUM_MAX_ITERATIONS, 4 );
+            get_ros_parameter( *this, "r3live_lio.fov_degree", fov_deg, 360.00 );
+            get_ros_parameter( *this, "r3live_lio.voxel_downsample_size_surf", m_voxel_downsample_size_surf, 0.3 );
+            get_ros_parameter( *this, "r3live_lio.voxel_downsample_size_axis_z", m_voxel_downsample_size_axis_z,
                                m_voxel_downsample_size_surf );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/filter_size_map", filter_size_map_min, 0.4 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/cube_side_length", cube_len, 10000000.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/maximum_pt_kdtree_dis", m_maximum_pt_kdtree_dis, 0.5 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/maximum_res_dis", m_maximum_res_dis, 0.3 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/planar_check_dis", m_planar_check_dis, 0.10 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/long_rang_pt_dis", m_long_rang_pt_dis, 500.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/publish_feature_map", m_if_publish_feature_map, false );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/lio_update_point_step", m_lio_update_point_step, 1 );
+            get_ros_parameter( *this, "r3live_lio.filter_size_map", filter_size_map_min, 0.4 );
+            get_ros_parameter( *this, "r3live_lio.cube_side_length", cube_len, 10000000.0 );
+            get_ros_parameter( *this, "r3live_lio.maximum_pt_kdtree_dis", m_maximum_pt_kdtree_dis, 0.5 );
+            get_ros_parameter( *this, "r3live_lio.maximum_res_dis", m_maximum_res_dis, 0.3 );
+            get_ros_parameter( *this, "r3live_lio.planar_check_dis", m_planar_check_dis, 0.10 );
+            get_ros_parameter( *this, "r3live_lio.long_rang_pt_dis", m_long_rang_pt_dis, 500.0 );
+            get_ros_parameter( *this, "r3live_lio.publish_feature_map", m_if_publish_feature_map, false );
+            get_ros_parameter( *this, "r3live_lio.lio_update_point_step", m_lio_update_point_step, 1 );
         }
         if ( 1 )
         {
@@ -406,10 +419,10 @@ public:
         g_cost_time_logger.init_log( std::string(m_map_output_dir).append("/cost_time_logger.log"));
         m_map_rgb_pts.set_minmum_dis(m_minumum_rgb_pts_size);
         m_map_rgb_pts.m_recent_visited_voxel_activated_time = m_recent_visited_voxel_activated_time;
-        featsFromMap = boost::make_shared<PointCloudXYZINormal>();
-        cube_points_add = boost::make_shared<PointCloudXYZINormal>();
-        laserCloudFullRes2 = boost::make_shared<PointCloudXYZINormal>();
-        laserCloudFullResColor = boost::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
+        featsFromMap = std::make_shared<PointCloudXYZINormal>();
+        cube_points_add = std::make_shared<PointCloudXYZINormal>();
+        laserCloudFullRes2 = std::make_shared<PointCloudXYZINormal>();
+        laserCloudFullResColor = std::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
 
         XAxisPoint_body = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
         XAxisPoint_world = Eigen::Vector3f(LIDAR_SP_LEN, 0.0, 0.0);
@@ -420,7 +433,6 @@ public:
         m_lio_state_fp = fopen( std::string(m_map_output_dir).append("/lic_lio.log").c_str(), "w+");
         m_lio_costtime_fp = fopen(std::string(m_map_output_dir).append("/lic_lio_costtime.log").c_str(), "w+");
         m_thread_pool_ptr->commit_task(&R3LIVE::service_LIO_update, this);
-             
     }
     ~R3LIVE(){};
 
@@ -441,10 +453,10 @@ public:
     bool center_in_FOV(Eigen::Vector3f cube_p);
     bool if_corner_in_FOV(Eigen::Vector3f cube_p);
     void lasermap_fov_segment();
-    void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
+    void feat_points_cbk(const sensor_msgs::msg::PointCloud2 &msg_in);
     void wait_render_thread_finish();
-    bool get_pointcloud_data_from_ros_message(sensor_msgs::PointCloud2::ConstPtr & msg, pcl::PointCloud<pcl::PointXYZINormal> & pcl_pc);
+    bool get_pointcloud_data_from_ros_message(sensor_msgs::msg::PointCloud2::ConstSharedPtr & msg, pcl::PointCloud<pcl::PointXYZINormal> & pcl_pc);
     int service_LIO_update();
-    void publish_render_pts( ros::Publisher &pts_pub, Global_map &m_map_rgb_pts );
+    void publish_render_pts( rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr &pts_pub, Global_map &m_map_rgb_pts );
     void print_dash_board();
 };

@@ -29,7 +29,7 @@ r3live_vio:
             -0.9999999,  -0.000486594, -0.00113994,
             0.000504622,  -0.999874,  -0.0158682]
    # camera_ext_t: [0.050166, 0.0474116, -0.0312415] 
-   camera_ext_t: [0,0,0] 
+   camera_ext_t: [0.00, 0.0, 0.0] 
    # Rough extrinsic value, form CAD model, is not correct enough, but can be online calibrated in our datasets.
    # camera_ext_R:
    #    [0, 0, 1,
