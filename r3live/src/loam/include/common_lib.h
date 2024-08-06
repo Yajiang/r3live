@@ -21,7 +21,7 @@
 #include <deque>
 #include "lib_sophus/se3.hpp"
 #include "lib_sophus/so3.hpp"
-// #define DEBUG_PRINT
+#define DEBUG_PRINT
 #define USE_ikdtree
 #define ESTIMATE_GRAVITY  1
 #define ENABLE_CAMERA_OBS 1
@@ -30,7 +30,8 @@
 #define printf_line std::cout << __FILE__ << " " << __LINE__ << std::endl;
 
 #define PI_M (3.14159265358)
-#define G_m_s2 (9.81)     // Gravity const in Hong Kong SAR, China
+// #define G_m_s2 (9.7218)     // Gravity const in Hong Kong SAR, China
+#define G_m_s2 (9794.4)     // Gravity const in Xi'an, China
 #if ENABLE_CAMERA_OBS
 #define DIM_OF_STATES (29) // with vio obs
 #else
@@ -39,7 +40,7 @@
 #define DIM_OF_PROC_N (12) // Dimension of process noise (Let Dim(SO(3)) = 3)
 #define CUBE_LEN (6.0)
 #define LIDAR_SP_LEN (2)
-#define INIT_COV (0.0001)
+#define INIT_COV (0.1)
 
 #define VEC_FROM_ARRAY(v) v[0], v[1], v[2]
 #define MAT_FROM_ARRAY(v) v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]
@@ -58,7 +59,9 @@ static const Eigen::Matrix3f Eye3f(Eigen::Matrix3f::Identity());
 static const Eigen::Vector3d Zero3d(0, 0, 0);
 static const Eigen::Vector3f Zero3f(0, 0, 0);
 // Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
-static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
+// static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
+// static const Eigen::Vector3d Lidar_offset_to_IMU(-0.03886, 0.0046, 0.03346); // POP3
+static const Eigen::Vector3d Lidar_offset_to_IMU(-38.86, 4.6, 33.46); // POP3
 
 struct Pose6D
 {
@@ -141,7 +144,7 @@ struct Camera_Lidar_queue
     double m_if_lidar_start_first = 1;
     double m_camera_imu_td = 0;
 
-    int m_if_acc_mul_G = 0;
+    int m_if_acc_mul_G = 1;
 
     int m_if_have_lidar_data = 0;
     int m_if_have_camera_data = 0;
@@ -334,8 +337,8 @@ public:
         vel_end = vec_3::Zero();
         bias_g = vec_3::Zero();
         bias_a = vec_3::Zero();
-        gravity = Eigen::Vector3d(0.0, 0.0, 9.805);
-        // gravity = Eigen::Vector3d(0.0, 9.805, 0.0);
+        // gravity = Eigen::Vector3d(0.0, 0.0, 9805);
+        gravity = Eigen::Vector3d(0.0, -G_m_s2, 0.0);
 
         //Ext camera w.r.t. IMU
         rot_ext_i2c = Eigen::Matrix3d::Identity();

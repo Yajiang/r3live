@@ -55,7 +55,7 @@ std::shared_ptr< Common_tools::ThreadPool > m_thread_pool_ptr;
 double                                      g_vio_frame_cost_time = 0;
 double                                      g_lio_frame_cost_time = 0;
 int                                         g_flag_if_first_rec_img = 1;
-#define DEBUG_PHOTOMETRIC 0
+#define DEBUG_PHOTOMETRIC 1
 #define USING_CERES 0
 void dump_lio_state_to_log( FILE *fp )
 {
@@ -170,6 +170,20 @@ void R3LIVE::set_initial_state_cov( StatesGroup &state )
     state.cov( 24, 24 ) = 0.00001;
     state.cov.block( 18, 18, 6, 6 ) = state.cov.block( 18, 18, 6, 6 ).setIdentity() *  1e-3; // Extrinsic between camera and IMU.
     state.cov.block( 25, 25, 4, 4 ) = state.cov.block( 25, 25, 4, 4 ).setIdentity() *  1e-3; // Camera intrinsic.
+    // Set cov
+    // scope_color( ANSI_COLOR_RED_BOLD );
+    // state.cov = state.cov.setIdentity() * INIT_COV;
+    // // state.cov.block(18, 18, 6 , 6 ) = state.cov.block(18, 18, 6 , 6 ) .setIdentity() * 0.1;
+    // // state.cov.block(24, 24, 5 , 5 ) = state.cov.block(24, 24, 5 , 5 ).setIdentity() * 0.001;
+    // state.cov.block( 0, 0, 3, 3 ) = mat_3_3::Identity() * 1e-5;   // R
+    // state.cov.block( 3, 3, 3, 3 ) = mat_3_3::Identity() * 1e-2;   // T
+    // state.cov.block( 6, 6, 3, 3 ) = mat_3_3::Identity() * 1e-2;   // vel
+    // state.cov.block( 9, 9, 3, 3 ) = mat_3_3::Identity() * 1;   // bias_g
+    // state.cov.block( 12, 12, 3, 3 ) = mat_3_3::Identity() * 100; // bias_a
+    // state.cov.block( 15, 15, 3, 3 ) = mat_3_3::Identity() * 1e-2; // Gravity
+    // state.cov( 24, 24 ) = 0.01;
+    // state.cov.block( 18, 18, 6, 6 ) = state.cov.block( 18, 18, 6, 6 ).setIdentity() *  1; // Extrinsic between camera and IMU.
+    // state.cov.block( 25, 25, 4, 4 ) = state.cov.block( 25, 25, 4, 4 ).setIdentity() *  1e-3; // Camera intrinsic.
 }
 
 cv::Mat R3LIVE::generate_control_panel_img()
@@ -211,10 +225,10 @@ void R3LIVE::set_initial_camera_parameter( StatesGroup &state, double *intrinsic
 
     m_inital_rot_ext_i2c = state.rot_ext_i2c;
     m_inital_pos_ext_i2c = state.pos_ext_i2c;
-    state.cam_intrinsic( 0 ) = g_cam_K( 0, 0 );
-    state.cam_intrinsic( 1 ) = g_cam_K( 1, 1 );
-    state.cam_intrinsic( 2 ) = g_cam_K( 0, 2 );
-    state.cam_intrinsic( 3 ) = g_cam_K( 1, 2 );
+    state.cam_intrinsic( 0 ) = g_cam_K( 0, 0 ) ;
+    state.cam_intrinsic( 1 ) = g_cam_K( 1, 1 ) ;
+    state.cam_intrinsic( 2 ) = g_cam_K( 0, 2 ) ;
+    state.cam_intrinsic( 3 ) = g_cam_K( 1, 2 ) ;
     set_initial_state_cov( state );
     m_mutex_lio_process.unlock();
 }
@@ -369,6 +383,7 @@ void   R3LIVE::process_image( cv::Mat &temp_img, double msg_time )
         cout << "Process image error, image rows =0 " << endl;
         return;
     }
+    // std::cout << "temp_img size " << temp_img.size() << std::endl;
 
     if ( msg_time < last_accept_time )
     {
@@ -458,6 +473,12 @@ void R3LIVE::load_vio_parameters()
     m_camera_dist_coeffs = Eigen::Map< Eigen::Matrix< double, 5, 1 > >( camera_dist_coeffs_data.data() );
     m_camera_ext_R = Eigen::Map< Eigen::Matrix< double, 3, 3, Eigen::RowMajor > >( camera_ext_R_data.data() );
     m_camera_ext_t = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( camera_ext_t_data.data() );
+    //static const Eigen::Vector3d Lidar_offset_to_IMU(-38.86, 4.6, 33.46); // POP3
+
+    m_camera_ext_t = -m_camera_ext_R * Lidar_offset_to_IMU +  m_camera_ext_t;
+
+    // m_camera_ext_R = m_camera_ext_R.inverse();
+    // m_camera_ext_t = - m_camera_ext_R * m_camera_ext_t;
 
     cout << "[Ros_parameter]: r3live_vio/Camera Intrinsic: " << endl;
     cout << m_camera_intrinsic << endl;
@@ -483,10 +504,10 @@ void R3LIVE::set_image_pose( std::shared_ptr< Image_frame > &image_pose, const S
 
     image_pose->m_cam_K << image_pose->fx, 0, image_pose->cx, 0, image_pose->fy, image_pose->cy, 0, 0, 1;
     scope_color( ANSI_COLOR_CYAN_BOLD );
-    // cout << "Set Image Pose frm [" << image_pose->m_frame_idx << "], pose: " << eigen_q(rot_mat).coeffs().transpose()
-    // << " | " << t_vec.transpose()
-    // << " | " << eigen_q(rot_mat).angularDistance( eigen_q::Identity()) *57.3 << endl;
-    // image_pose->inverse_pose();
+    cout << "Set Image Pose frm [" << image_pose->m_frame_idx << "], pose: " << eigen_q(rot_mat).coeffs().transpose()
+    << " | " << t_vec.transpose()
+    << " | " << eigen_q(rot_mat).angularDistance( eigen_q::Identity()) *57.3 << endl;
+    image_pose->inverse_pose();
 }
 
 void R3LIVE::publish_camera_odom( std::shared_ptr< Image_frame > &image, double msg_time )
@@ -651,10 +672,11 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
 
     double acc_reprojection_error = 0;
     double img_res_scale = 1.0;
+    std::cout << "vio_esikf!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << std::endl;
     for ( int iter_count = 0; iter_count < esikf_iter_times; iter_count++ )
     {
 
-        // cout << "========== Iter " << iter_count << " =========" << endl;
+        cout << "========== Iter " << iter_count << " =========" << endl;
         mat_3_3 R_imu = state_iter.rot_end;
         vec_3   t_imu = state_iter.pos_end;
         vec_3   t_c2w = R_imu * state_iter.pos_ext_i2c + t_imu;
@@ -703,7 +725,7 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
             // https://github.com/hku-mars/r2live/blob/master/supply/r2live_Supplementary_material.pdf
             mat_pre << fx / pt_3d_cam( 2 ), 0, -fx * pt_3d_cam( 0 ) / pt_3d_cam( 2 ), 0, fy / pt_3d_cam( 2 ), -fy * pt_3d_cam( 1 ) / pt_3d_cam( 2 );
 
-            pt_hat = Sophus::SO3d::hat( ( R_imu.transpose() * ( pt_3d_w - t_imu ) ) );
+            pt_hat = Sophus::SO3d::hat( ( R_imu.transpose() * ( pt_3d_w - t_imu ) ) ); // convert pt -> imu body 
             mat_A = state_iter.rot_ext_i2c.transpose() * pt_hat;
             mat_B = -state_iter.rot_ext_i2c.transpose() * ( R_imu.transpose() );
             mat_C = Sophus::SO3d::hat( pt_3d_cam );
@@ -735,6 +757,9 @@ bool      R3LIVE::vio_esikf( StatesGroup &state_in, Rgbmap_tracker &op_track )
         }
         H_mat = H_mat / img_res_scale;
         acc_reprojection_error /= total_pt_size;
+        std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << std::endl;
+        std::cout << "project error: " << acc_reprojection_error << std::endl;
+        std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << std::endl;
 
         last_avr_repro_err = acc_reprojection_error;
         if ( avail_pt_count < minimum_iteration_pts )
@@ -1241,7 +1266,7 @@ void R3LIVE::service_VIO_update()
         tim.tic( "Pub" );
         double display_cost_time = std::accumulate( frame_cost_time_vec.begin(), frame_cost_time_vec.end(), 0.0 ) / frame_cost_time_vec.size();
         g_vio_frame_cost_time = display_cost_time;
-        // publish_render_pts( m_pub_render_rgb_pts, m_map_rgb_pts );
+        publish_render_pts( m_pub_render_rgb_pts, m_map_rgb_pts );
         publish_camera_odom( img_pose, message_time );
         // publish_track_img( op_track.m_debug_track_img, display_cost_time );
         publish_track_img( img_pose->m_raw_img, display_cost_time );

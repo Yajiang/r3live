@@ -102,7 +102,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 
 #define INIT_TIME (0)
 // #define LASER_POINT_COV (0.0015) // Ori
-#define LASER_POINT_COV (0.00015)    
+#define LASER_POINT_COV (0.01)    
 #define NUM_MATCH_POINTS (5)
 
 #define MAXN 360000
@@ -133,9 +133,9 @@ public:
     std::string root_dir = ROOT_DIR;
     FILE * m_lio_state_fp;
     FILE * m_lio_costtime_fp;
-    double m_maximum_pt_kdtree_dis = 1.0;
+    double m_maximum_pt_kdtree_dis = 20.0;
     double m_maximum_res_dis = 1.0;
-    double m_planar_check_dis = 0.05;
+    double m_planar_check_dis = 0.2;
     double m_lidar_imu_time_delay = 0;
     double m_long_rang_pt_dis = 500.0;
     bool m_if_publish_feature_map = false;
@@ -378,17 +378,17 @@ public:
             scope_color( ANSI_COLOR_GREEN );
             get_ros_parameter( m_ros_node_handle, "r3live_lio/dense_map_enable", dense_map_en, true );
             get_ros_parameter( m_ros_node_handle, "r3live_lio/lidar_time_delay", m_lidar_imu_time_delay, 0.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/max_iteration", NUM_MAX_ITERATIONS, 4 );
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/max_iteration", NUM_MAX_ITERATIONS, 40 );
             get_ros_parameter( m_ros_node_handle, "r3live_lio/fov_degree", fov_deg, 360.00 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/voxel_downsample_size_surf", m_voxel_downsample_size_surf, 0.3 );
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/voxel_downsample_size_surf", m_voxel_downsample_size_surf, 0.5);
             get_ros_parameter( m_ros_node_handle, "r3live_lio/voxel_downsample_size_axis_z", m_voxel_downsample_size_axis_z,
                                m_voxel_downsample_size_surf );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/filter_size_map", filter_size_map_min, 0.4 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/cube_side_length", cube_len, 10000000.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/maximum_pt_kdtree_dis", m_maximum_pt_kdtree_dis, 0.5 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/maximum_res_dis", m_maximum_res_dis, 0.3 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/planar_check_dis", m_planar_check_dis, 0.10 );
-            get_ros_parameter( m_ros_node_handle, "r3live_lio/long_rang_pt_dis", m_long_rang_pt_dis, 500.0 );
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/filter_size_map", filter_size_map_min, 0.2);
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/cube_side_length", cube_len, 500.0 );
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/maximum_pt_kdtree_dis", m_maximum_pt_kdtree_dis, 20.0);
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/maximum_res_dis", m_maximum_res_dis, 1.0);
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/planar_check_dis", m_planar_check_dis, 2.0);
+            get_ros_parameter( m_ros_node_handle, "r3live_lio/long_rang_pt_dis", m_long_rang_pt_dis, 1000.0 );
             get_ros_parameter( m_ros_node_handle, "r3live_lio/publish_feature_map", m_if_publish_feature_map, false );
             get_ros_parameter( m_ros_node_handle, "r3live_lio/lio_update_point_step", m_lio_update_point_step, 1 );
         }

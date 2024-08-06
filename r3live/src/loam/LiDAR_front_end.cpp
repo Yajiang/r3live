@@ -186,6 +186,9 @@ void   mid_handler( const sensor_msgs::PointCloud2::ConstPtr &msg )
     give_feature( pl, types, pl_corn, pl_surf );
 
     ros::Time ct( ros::Time::now() );
+    // std::cout <<"publish size : " <<  pl.size() << std::endl;
+    // std::cout <<"pl surf size : " <<  pl_surf.size() << std::endl;
+    // std::cout <<"pl corn size : " <<  pl_corn.size() << std::endl;
     pub_func( pl, pub_full, msg->header.stamp );
     pub_func( pl_surf, pub_surf, msg->header.stamp );
     pub_func( pl_corn, pub_corn, msg->header.stamp );

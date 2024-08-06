@@ -31,16 +31,19 @@ const inline bool time_list(PointType &x, PointType &y) {return (x.curvature < y
 bool check_state(StatesGroup &state_inout);
 void check_in_out_state(const StatesGroup &state_in, StatesGroup &state_inout);
 
+extern double g_imu_scale_factor;
+
 /// *************IMU Process and undistortion
 class ImuProcess
 {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  float Scale_factor;
 
   ImuProcess();
   ~ImuProcess();
 
-  void Process(const MeasureGroup &meas, StatesGroup &state, PointCloudXYZINormal::Ptr pcl_un_);
+  void Process(MeasureGroup &meas, StatesGroup &state, PointCloudXYZINormal::Ptr pcl_un_);
   void Reset();
   void IMU_Initial(const MeasureGroup &meas, StatesGroup &state, int &N);
 

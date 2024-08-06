@@ -1,13 +1,17 @@
 #include "IMU_Processing.hpp"
 #define COV_OMEGA_NOISE_DIAG 1e-1
-#define COV_ACC_NOISE_DIAG 0.4
-#define COV_GYRO_NOISE_DIAG 0.2
+// #define COV_ACC_NOISE_DIAG 0.4
+#define COV_ACC_NOISE_DIAG 360
+#define COV_GYRO_NOISE_DIAG 0.02
 
-#define COV_BIAS_ACC_NOISE_DIAG 0.05
-#define COV_BIAS_GYRO_NOISE_DIAG 0.1
+// #define COV_BIAS_ACC_NOISE_DIAG 1
+#define COV_BIAS_ACC_NOISE_DIAG 4
+// #define COV_BIAS_GYRO_NOISE_DIAG 0.1
+#define COV_BIAS_GYRO_NOISE_DIAG 0.001
 
-#define COV_START_ACC_DIAG 1e-1
-#define COV_START_GYRO_DIAG 1e-1
+// #define COV_START_ACC_DIAG 1e-1
+#define COV_START_ACC_DIAG 360
+#define COV_START_GYRO_DIAG 3e-6
 // #define COV_NOISE_EXT_I2C_R (0.0 * 1e-3)
 // #define COV_NOISE_EXT_I2C_T (0.0 * 1e-3)
 // #define COV_NOISE_EXT_I2C_Td (0.0 * 1e-3)
@@ -15,6 +19,7 @@
 
 
 double g_lidar_star_tim = 0;
+double g_imu_scale_factor = 1.00352;
 ImuProcess::ImuProcess() : b_first_frame_( true ), imu_need_init_( true ), last_imu_( nullptr ), start_timestamp_( -1 )
 {
     Eigen::Quaterniond q( 0, 1, 0, 0 );
@@ -22,7 +27,8 @@ ImuProcess::ImuProcess() : b_first_frame_( true ), imu_need_init_( true ), last_
     init_iter_num = 1;
     cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
     cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    mean_acc = Eigen::Vector3d( 0, 0, -9.805 );
+    mean_acc = Eigen::Vector3d(0, 0, 0);
+    // mean_acc = Eigen::Vector3d(0, -245.125, 0);
     mean_gyr = Eigen::Vector3d( 0, 0, 0 );
     angvel_last = Zero3d;
     cov_proc_noise = Eigen::Matrix< double, DIM_OF_PROC_N, 1 >::Zero();
@@ -42,7 +48,11 @@ void ImuProcess::Reset()
 
     cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
     cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    mean_acc = Eigen::Vector3d( 0, 0, -9.805 );
+    // cov_acc = Eigen::Vector3d( 0,0,0 );
+    // cov_gyr = Eigen::Vector3d( 0,0,0 );
+    // mean_acc = Eigen::Vector3d( 0, -9805, 0);
+    mean_acc = Eigen::Vector3d( 0, 0, 0);
+    // mean_acc = Eigen::Vector3d(0, -245.125, 0);
     mean_gyr = Eigen::Vector3d( 0, 0, 0 );
 
     imu_need_init_ = true;
@@ -69,7 +79,7 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
     if ( b_first_frame_ )
     {
         Reset();
-        N = 1;
+        N = 0;
         b_first_frame_ = false;
     }
 
@@ -80,22 +90,41 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
         cur_acc << imu_acc.x, imu_acc.y, imu_acc.z;
         cur_gyr << gyr_acc.x, gyr_acc.y, gyr_acc.z;
 
-        mean_acc += ( cur_acc - mean_acc ) / N;
-        mean_gyr += ( cur_gyr - mean_gyr ) / N;
+        if(N== 0)
+        {
+            mean_acc += cur_acc;
+            mean_gyr += cur_gyr;
+        }
+        else
+        {
+            cov_acc = cov_acc * (N - 1.0) / N + (cur_acc - mean_acc).cwiseProduct(cur_acc - mean_acc) * (N - 1.0) / (N * N);
+            cov_gyr = cov_gyr * (N - 1.0) / N + (cur_gyr - mean_gyr).cwiseProduct(cur_gyr - mean_gyr) * (N - 1.0) / (N * N);
 
-        cov_acc = cov_acc * ( N - 1.0 ) / N + ( cur_acc - mean_acc ).cwiseProduct( cur_acc - mean_acc ) * ( N - 1.0 ) / ( N * N );
-        cov_gyr = cov_gyr * ( N - 1.0 ) / N + ( cur_gyr - mean_gyr ).cwiseProduct( cur_gyr - mean_gyr ) * ( N - 1.0 ) / ( N * N );
+            mean_acc += (cur_acc - mean_acc) / N;
+            mean_gyr += (cur_gyr - mean_gyr) / N;
+        }
         // cov_acc = Eigen::Vector3d(0.1, 0.1, 0.1);
         // cov_gyr = Eigen::Vector3d(0.01, 0.01, 0.01);
         N++;
     }
+    // g_imu_scale_factor =  mean_acc.norm() / G_m_s2;
+    // mean_acc *= 1.0 / g_imu_scale_factor;
+    // std::cout << "g_imu_scale_factor" << g_imu_scale_factor << std::endl;
 
     // TODO: fix the cov
-    cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
-    cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    state_inout.gravity = Eigen::Vector3d( 0, 0, 9.805 );
+    // cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
+    // cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
+    // state_inout.gravity = Eigen::Vector3d( 0, 0, 9805 );
+    // state_inout.gravity = Eigen::Vector3d( 0, -G_m_s2, 0 );
+    // we assume at the beginning, imu is almost static
+    state_inout.gravity = mean_acc / mean_acc.norm() * G_m_s2;
+    state_inout.bias_a = mean_acc - state_inout.gravity;
     state_inout.rot_end = Eye3d;
     state_inout.bias_g = mean_gyr;
+
+    std::cout << "cov_acc" << cov_acc <<std::endl;
+    std::cout << "cov_gyro" << cov_gyr <<std::endl;
+    std::cout << "bias_a" << state_inout.bias_a <<std::endl;
 }
 
 void ImuProcess::lic_state_propagate( const MeasureGroup &meas, StatesGroup &state_inout )
@@ -123,7 +152,7 @@ bool check_state( StatesGroup &state_inout )
     bool is_fail = false;
     for ( int idx = 0; idx < 3; idx++ )
     {
-        if ( fabs( state_inout.vel_end( idx ) ) > 10 )
+        if ( fabs( state_inout.vel_end( idx ) ) > 1000)
         {
             is_fail = true;
             scope_color( ANSI_COLOR_RED_BG );
@@ -133,6 +162,13 @@ bool check_state( StatesGroup &state_inout )
             }
             state_inout.vel_end( idx ) = 0.0;
         }
+        else
+        {
+            for ( int i = 0; i < 10; i++ )
+            {
+                // cout << __FILE__ << ", " << __LINE__ << ", check_state !!!! " << state_inout.pos_end.transpose() << endl;
+            }
+        }
     }
     return is_fail;
 }
@@ -140,7 +176,7 @@ bool check_state( StatesGroup &state_inout )
 // Avoid abnormal state input
 void check_in_out_state( const StatesGroup &state_in, StatesGroup &state_inout )
 {
-    if ( ( state_in.pos_end - state_inout.pos_end ).norm() > 1.0 )
+    if ( ( state_in.pos_end - state_inout.pos_end ).norm() > 1000 )
     {
         scope_color( ANSI_COLOR_RED_BG );
         for ( int i = 0; i < 10; i++ )
@@ -208,9 +244,9 @@ StatesGroup ImuProcess::imu_preintegration( const StatesGroup &state_in, std::de
         {
             dt = tail->header.stamp.toSec() - head->header.stamp.toSec();
         }
-        if ( dt > 0.05 )
+        if ( dt > 0.01 )
         {
-            dt = 0.05;
+            dt = 0.01;
         }
 
         /* covariance propagation */
@@ -428,11 +464,12 @@ void ImuProcess::lic_point_cloud_undistort( const MeasureGroup &meas, const Stat
     }
 }
 
-void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_ )
+void ImuProcess::Process( MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_ )
 {
     // double t1, t2, t3;
     // t1 = omp_get_wtime();
 
+    std::cout << "pointcloud size : " << meas.lidar->size() << std::endl;
     if ( meas.imu.empty() )
     {
         // std::cout << "no imu data" << std::endl;
@@ -452,7 +489,8 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
         if ( init_iter_num > MAX_INI_COUNT )
         {
             imu_need_init_ = false;
-            // std::cout<<"mean acc: "<<mean_acc<<" acc measures in word frame:"<<state.rot_end.transpose()*mean_acc<<std::endl;
+            std::cout<<"mean acc: "<<mean_acc<<" acc measures in word frame:"<<stat.rot_end.transpose()*mean_acc<<std::endl;
+            std::cout<<"mean acc normal: "<<mean_acc.norm()<<std::endl;
             ROS_INFO(
                 "IMU Initials: Gravity: %.4f %.4f %.4f; state.bias_g: %.4f %.4f %.4f; acc covarience: %.8f %.8f %.8f; gry covarience: %.8f %.8f %.8f",
                 stat.gravity[ 0 ], stat.gravity[ 1 ], stat.gravity[ 2 ], stat.bias_g[ 0 ], stat.bias_g[ 1 ], stat.bias_g[ 2 ], cov_acc[ 0 ],
@@ -461,6 +499,13 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
 
         return;
     }
+    // for(auto & msg : meas.imu)
+    // {
+    //     msg->linear_acceleration.x *= 1.0 / g_imu_scale_factor;
+    //     msg->linear_acceleration.y *= 1.0 / g_imu_scale_factor;
+    //     msg->linear_acceleration.z *= 1.0 / g_imu_scale_factor;
+    // }
+
 
     /// Undistort points： the first point is assummed as the base frame
     /// Compensate lidar points with IMU rotation (with only rotation now)
@@ -472,7 +517,7 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
     }
     else
     {
-        if ( 1 )
+        if ( 0 )
         {
             lic_point_cloud_undistort( meas, stat, *cur_pcl_un_ );
         }
@@ -489,4 +534,5 @@ void ImuProcess::Process( const MeasureGroup &meas, StatesGroup &stat, PointClou
     // t3 = omp_get_wtime();
 
     // std::cout<<"[ IMU Process ]: Time: "<<t3 - t1<<std::endl;
+    std::cout << "pointcloud size after : " << meas.lidar->size() << std::endl;
 }

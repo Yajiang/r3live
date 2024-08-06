@@ -46,6 +46,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  POSSIBILITY OF SUCH DAMAGE.
 */
 #include "r3live.hpp"
+#include <pcl/registration/icp.h>
 
 void R3LIVE::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
 {
@@ -70,6 +71,10 @@ void R3LIVE::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
         msg->linear_acceleration.z *= G_m_s2;
     }
 
+    // std::cout<<"imu data: "<< msg->linear_acceleration.x << " "
+    // << msg->linear_acceleration.y << " "
+    // << msg->linear_acceleration.z << " \n"
+    // << std::endl;
     imu_buffer_lio.push_back( msg );
     imu_buffer_vio.push_back( msg );
     // std::cout<<"got imu: "<<timestamp<<" imu size "<<imu_buffer_lio.size()<<std::endl;
@@ -540,6 +545,8 @@ int R3LIVE::service_LIO_update()
             std::this_thread::sleep_for( std::chrono::milliseconds( THREAD_SLEEP_TIM ) );
         }
         std::unique_lock< std::mutex > lock( m_mutex_lio_process );
+        pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+
         if ( 1 )
         {
             // printf_line;
@@ -566,6 +573,7 @@ int R3LIVE::service_LIO_update()
             pca_time = 0;
             svd_time = 0;
             t0 = omp_get_wtime();
+
             p_imu->Process( Measures, g_lio_state, feats_undistort );
 
             g_camera_lidar_queue.g_noise_cov_acc = p_imu->cov_acc;
@@ -598,7 +606,7 @@ int R3LIVE::service_LIO_update()
                       << g_lio_state.vel_end.transpose() << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose()
                       << std::endl;
 #endif
-            lasermap_fov_segment();
+            // lasermap_fov_segment();
             downSizeFilterSurf.setInputCloud( feats_undistort );
             downSizeFilterSurf.filter( *feats_down );
             // cout <<"Preprocess cost time: " << tim.toc("Preprocess") << endl;
@@ -607,7 +615,12 @@ int R3LIVE::service_LIO_update()
             {
                 // std::vector<PointType> points_init = feats_down->points;
                 ikdtree.set_downsample_param( filter_size_map_min );
+                for ( int i = 0; i < feats_down->points.size(); i++ )
+                {
+                    pointBodyToWorld( &( feats_down->points[ i ] ), &( feats_down->points[ i ] ) );
+                }
                 ikdtree.Build( feats_down->points );
+                std::cout << "Initialize Map iKD-Tree size: ~~~~~~~"<< feats_down->points.size()<< std::endl;
                 flg_map_initialized = true;
                 continue;
             }
@@ -619,8 +632,30 @@ int R3LIVE::service_LIO_update()
                 continue;
             }
             int featsFromMapNum = ikdtree.size();
+            {
+                // PointVector().swap( ikdtree.PCL_Storage );
+                // ikdtree.flatten( ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD );
+                // featsFromMap->clear();
+                // featsFromMap->points = ikdtree.PCL_Storage;
+                // icp.setInputSource(feats_down);
+                // icp.setInputTarget(featsFromMap)
+                // pcl::PointCloud<pcl::PointXYZ> Final;
+                // icp.align(Final);
+                // if (icp.hasConverged())
+                // {
+                //     std::cout << "ICP has converged, score is " << icp.getFitnessScore() << std::endl;
+                //     std::cout << "Transformation matrix:\n"
+                //               << icp.getFinalTransformation() << std::endl;
+                // }
+                // else
+                // {
+                //     PCL_ERROR("ICP has not converged.\n");
+                //     return -1;
+                // }
+            }
 
             int feats_down_size = feats_down->points.size();
+            std::cout << "feats_down size  "<< feats_down_size << std::endl;
             
             /*** ICP and iterated Kalman filter update ***/
             PointCloudXYZINormal::Ptr coeffSel_tmpt( new PointCloudXYZINormal( *feats_down ) );
@@ -658,8 +693,21 @@ int R3LIVE::service_LIO_update()
                 t2 = omp_get_wtime();
                 double maximum_pt_range = 0.0;
                 // cout <<"Preprocess 2 cost time: " << tim.toc("Preprocess") << endl;
+                // add icp process
                 for ( iterCount = 0; iterCount < NUM_MAX_ITERATIONS; iterCount++ )
                 {
+                    int norm_x = 0;
+                    int norm_y = 0;
+                    int norm_z = 0;
+
+                    std::cout << "state before optimize:" << std::endl;
+                    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
+                    // check_state(g_lio_state);
+                    StatesGroup::display(g_lio_state);
+                    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
+                    std::cout << "state before optimize:" << std::endl;
+                    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
+                    check_state(g_lio_state);
                     tim.tic( "Iter" );
                     match_start = omp_get_wtime();
                     laserCloudOri->clear();
@@ -677,6 +725,7 @@ int R3LIVE::service_LIO_update()
 
                         /* transform to world frame */
                         pointBodyToWorld( &pointOri_tmpt, &pointSel_tmpt );
+
                         std::vector< float > pointSearchSqDis_surf;
 
                         auto &points_near = Nearest_Points[ i ];
@@ -725,6 +774,23 @@ int R3LIVE::service_LIO_update()
                         pb /= ps;
                         pc /= ps;
                         pd /= ps;
+
+                        float pa_n = abs(pa);
+                        float pb_n = abs(pb);
+                        float pc_n = abs(pc);
+
+                        if(pa_n < pb_n && pa_n < pc_n)
+                        {
+                            norm_x ++;
+                        }
+                        else if (pb_n < pa_n && pb_n < pc_n)
+                        {
+                            norm_y ++;
+                        }
+                        else
+                        {
+                            norm_z ++ ;
+                        }
 
                         bool planeValid = true;
                         for ( int j = 0; j < NUM_MATCH_POINTS; j++ )
@@ -797,6 +863,7 @@ int R3LIVE::service_LIO_update()
                     Eigen::MatrixXd Hsub( laserCloudSelNum, 6 );
                     Eigen::VectorXd meas_vec( laserCloudSelNum );
                     Hsub.setZero();
+                    std::cout << "coeff size : " << coeffSel->size() << std::endl;
 
                     for ( int i = 0; i < laserCloudSelNum; i++ )
                     {
@@ -990,7 +1057,7 @@ int R3LIVE::service_LIO_update()
                 }
                 stastic_cost_time.push_back( tim.toc( " ", 0 ) );
             }
-            if(0) // Uncomment this code scope to enable the publish of effective points.
+            if(1) // Uncomment this code scope to enable the publish of effective points.
             {
                 /******* Publish effective points *******/
                 laserCloudFullResColor->clear();
@@ -1002,6 +1069,7 @@ int R3LIVE::service_LIO_update()
                 }
                 sensor_msgs::PointCloud2 laserCloudFullRes3;
                 pcl::toROSMsg( *laserCloudFullResColor, laserCloudFullRes3 );
+                std::cout << "effective points size :" << laserCloudFullResColor->size() << std::endl;
                 // laserCloudFullRes3.header.stamp = ros::Time::now(); //.fromSec(last_timestamp_lidar);
                 laserCloudFullRes3.header.stamp.fromSec( Measures.lidar_end_time ); //.fromSec(last_timestamp_lidar);
                 laserCloudFullRes3.header.frame_id = "world";
@@ -1074,6 +1142,11 @@ int R3LIVE::service_LIO_update()
             time_log_counter++;
             fprintf( m_lio_costtime_fp, "%.5f %.5f\r\n", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time, t5 - t0 );
             fflush( m_lio_costtime_fp );
+            std::cout << "global state :" <<std::endl;
+            std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" <<std::endl;
+            // check_state(g_lio_state);
+            StatesGroup::display(g_lio_state);
+            std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" <<std::endl;
         }
         status = ros::ok();
         rate.sleep();
