@@ -505,7 +505,7 @@ void R3LIVE::set_image_pose( std::shared_ptr< Image_frame > &image_pose, const S
     image_pose->m_cam_K << image_pose->fx, 0, image_pose->cx, 0, image_pose->fy, image_pose->cy, 0, 0, 1;
     scope_color( ANSI_COLOR_CYAN_BOLD );
     cout << "Set Image Pose frm [" << image_pose->m_frame_idx << "], pose: " << eigen_q(rot_mat).coeffs().transpose()
-    << " | " << t_vec.transpose()
+    << " | " << pose_t.transpose()
     << " | " << eigen_q(rot_mat).angularDistance( eigen_q::Identity()) *57.3 << endl;
     image_pose->inverse_pose();
 }
@@ -1175,101 +1175,103 @@ void R3LIVE::service_VIO_update()
 
         g_camera_frame_idx++;
         tim.tic( "Wait" );
-        while ( g_camera_lidar_queue.if_camera_can_process() == false )
-        {
-            ros::spinOnce();
-            std::this_thread::sleep_for( std::chrono::milliseconds( THREAD_SLEEP_TIM ) );
-            std::this_thread::yield();
-            cv_keyboard_callback();
-        }
-        g_cost_time_logger.record( tim, "Wait" );
-        m_mutex_lio_process.lock();
-        tim.tic( "Frame" );
-        tim.tic( "Track_img" );
-        StatesGroup state_out;
-        m_cam_measurement_weight = std::max( 0.001, std::min( 5.0 / m_number_of_new_visited_voxel, 0.01 ) );
-        if ( vio_preintegration( g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_i2c ) == false )
-        {
-            m_mutex_lio_process.unlock();
-            continue;
-        }
-        set_image_pose( img_pose, state_out );
+        // while ( g_camera_lidar_queue.if_camera_can_process() == false )
+        // {
+        //     ros::spinOnce();
+        //     std::this_thread::sleep_for( std::chrono::milliseconds( THREAD_SLEEP_TIM ) );
+        //     std::this_thread::yield();
+        //     cv_keyboard_callback();
+        // }
+        // g_cost_time_logger.record( tim, "Wait" );
+        // m_mutex_lio_process.lock();
+        // tim.tic( "Frame" );
+        // tim.tic( "Track_img" );
+        // StatesGroup state_out;
+        // m_cam_measurement_weight = std::max( 0.001, std::min( 5.0 / m_number_of_new_visited_voxel, 0.01 ) );
+        // if ( vio_preintegration( g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_i2c ) == false )
+        // {
+        //     m_mutex_lio_process.unlock();
+        //     continue;
+        // }
+        // set_image_pose( img_pose, state_out );
 
-        op_track.track_img( img_pose, -20 );
-        g_cost_time_logger.record( tim, "Track_img" );
-        // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
-        tim.tic( "Ransac" );
-        set_image_pose( img_pose, state_out );
+        // op_track.track_img( img_pose, -20 );
+        // g_cost_time_logger.record( tim, "Track_img" );
+        // // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
+        // tim.tic( "Ransac" );
+        // set_image_pose( img_pose, state_out );
 
-        // ANCHOR -  remove point using PnP.
-        if ( op_track.remove_outlier_using_ransac_pnp( img_pose ) == 0 )
-        {
-            cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
-        }
-        g_cost_time_logger.record( tim, "Ransac" );
-        tim.tic( "Vio_f2f" );
-        bool res_esikf = true, res_photometric = true;
-        wait_render_thread_finish();
-        res_esikf = vio_esikf( state_out, op_track );
-        g_cost_time_logger.record( tim, "Vio_f2f" );
-        tim.tic( "Vio_f2m" );
-        res_photometric = vio_photometric( state_out, op_track, img_pose );
-        g_cost_time_logger.record( tim, "Vio_f2m" );
-        g_lio_state = state_out;
-        print_dash_board();
-        set_image_pose( img_pose, state_out );
+        // // ANCHOR -  remove point using PnP.
+        // if ( op_track.remove_outlier_using_ransac_pnp( img_pose ) == 0 )
+        // {
+        //     cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
+        // }
+        // g_cost_time_logger.record( tim, "Ransac" );
+        // tim.tic( "Vio_f2f" );
+        // bool res_esikf = true, res_photometric = true;
+        // wait_render_thread_finish();
 
-        if ( 1 )
-        {
-            tim.tic( "Render" );
-            // m_map_rgb_pts.render_pts_in_voxels(img_pose, m_last_added_rgb_pts_vec);
-            if ( 1 ) // Using multiple threads for rendering
-            {
-                m_map_rgb_pts.m_if_get_all_pts_in_boxes_using_mp = 0;
-                // m_map_rgb_pts.render_pts_in_voxels_mp(img_pose, &m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
-                // img_pose->m_timestamp);
-                m_render_thread = std::make_shared< std::shared_future< void > >( m_thread_pool_ptr->commit_task(
-                    render_pts_in_voxels_mp, img_pose, &m_map_rgb_pts.m_voxels_recent_visited, img_pose->m_timestamp ) );
-            }
-            else
-            {
-                m_map_rgb_pts.m_if_get_all_pts_in_boxes_using_mp = 0;
-                // m_map_rgb_pts.render_pts_in_voxels( img_pose, m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
-                // img_pose->m_timestamp );
-            }
-            m_map_rgb_pts.m_last_updated_frame_idx = img_pose->m_frame_idx;
-            g_cost_time_logger.record( tim, "Render" );
+        
+        // res_esikf = vio_esikf( state_out, op_track );
+        // g_cost_time_logger.record( tim, "Vio_f2f" );
+        // tim.tic( "Vio_f2m" );
+        // res_photometric = vio_photometric( state_out, op_track, img_pose );
+        // g_cost_time_logger.record( tim, "Vio_f2m" );
+        // g_lio_state = state_out;
+        // print_dash_board();
+        // set_image_pose( img_pose, state_out );
 
-            tim.tic( "Mvs_record" );
-            if ( m_if_record_mvs )
-            {
-                // m_mvs_recorder.insert_image_and_pts( img_pose, m_map_rgb_pts.m_voxels_recent_visited );
-                m_mvs_recorder.insert_image_and_pts( img_pose, m_map_rgb_pts.m_pts_last_hitted );
-            }
-            g_cost_time_logger.record( tim, "Mvs_record" );
-        }
-        // ANCHOR - render point cloud
-        dump_lio_state_to_log( m_lio_state_fp );
-        m_mutex_lio_process.unlock();
-        // cout << "Solve image pose cost " << tim.toc("Solve_pose") << endl;
-        m_map_rgb_pts.update_pose_for_projection( img_pose, -0.4 );
-        op_track.update_and_append_track_pts( img_pose, m_map_rgb_pts, m_track_windows_size / m_vio_scale_factor, 1000000 );
-        g_cost_time_logger.record( tim, "Frame" );
-        double frame_cost = tim.toc( "Frame" );
-        g_image_vec.push_back( img_pose );
-        frame_cost_time_vec.push_back( frame_cost );
-        if ( g_image_vec.size() > 10 )
-        {
-            g_image_vec.pop_front();
-            frame_cost_time_vec.pop_front();
-        }
-        tim.tic( "Pub" );
-        double display_cost_time = std::accumulate( frame_cost_time_vec.begin(), frame_cost_time_vec.end(), 0.0 ) / frame_cost_time_vec.size();
-        g_vio_frame_cost_time = display_cost_time;
-        publish_render_pts( m_pub_render_rgb_pts, m_map_rgb_pts );
-        publish_camera_odom( img_pose, message_time );
-        // publish_track_img( op_track.m_debug_track_img, display_cost_time );
-        publish_track_img( img_pose->m_raw_img, display_cost_time );
+        // if ( 1 )
+        // {
+        //     tim.tic( "Render" );
+        //     // m_map_rgb_pts.render_pts_in_voxels(img_pose, m_last_added_rgb_pts_vec);
+        //     if ( 1 ) // Using multiple threads for rendering
+        //     {
+        //         m_map_rgb_pts.m_if_get_all_pts_in_boxes_using_mp = 0;
+        //         // m_map_rgb_pts.render_pts_in_voxels_mp(img_pose, &m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
+        //         // img_pose->m_timestamp);
+        //         m_render_thread = std::make_shared< std::shared_future< void > >( m_thread_pool_ptr->commit_task(
+        //             render_pts_in_voxels_mp, img_pose, &m_map_rgb_pts.m_voxels_recent_visited, img_pose->m_timestamp ) );
+        //     }
+        //     else
+        //     {
+        //         m_map_rgb_pts.m_if_get_all_pts_in_boxes_using_mp = 0;
+        //         // m_map_rgb_pts.render_pts_in_voxels( img_pose, m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
+        //         // img_pose->m_timestamp );
+        //     }
+        //     m_map_rgb_pts.m_last_updated_frame_idx = img_pose->m_frame_idx;
+        //     g_cost_time_logger.record( tim, "Render" );
+
+        //     tim.tic( "Mvs_record" );
+        //     if ( m_if_record_mvs )
+        //     {
+        //         // m_mvs_recorder.insert_image_and_pts( img_pose, m_map_rgb_pts.m_voxels_recent_visited );
+        //         m_mvs_recorder.insert_image_and_pts( img_pose, m_map_rgb_pts.m_pts_last_hitted );
+        //     }
+        //     g_cost_time_logger.record( tim, "Mvs_record" );
+        // }
+        // // ANCHOR - render point cloud
+        // dump_lio_state_to_log( m_lio_state_fp );
+        // m_mutex_lio_process.unlock();
+        // // cout << "Solve image pose cost " << tim.toc("Solve_pose") << endl;
+        // m_map_rgb_pts.update_pose_for_projection( img_pose, -0.4 );
+        // op_track.update_and_append_track_pts( img_pose, m_map_rgb_pts, m_track_windows_size / m_vio_scale_factor, 1000000 );
+        // g_cost_time_logger.record( tim, "Frame" );
+        // double frame_cost = tim.toc( "Frame" );
+        // g_image_vec.push_back( img_pose );
+        // frame_cost_time_vec.push_back( frame_cost );
+        // if ( g_image_vec.size() > 10 )
+        // {
+        //     g_image_vec.pop_front();
+        //     frame_cost_time_vec.pop_front();
+        // }
+        // tim.tic( "Pub" );
+        // double display_cost_time = std::accumulate( frame_cost_time_vec.begin(), frame_cost_time_vec.end(), 0.0 ) / frame_cost_time_vec.size();
+        // g_vio_frame_cost_time = display_cost_time;
+        // publish_render_pts( m_pub_render_rgb_pts, m_map_rgb_pts );
+        // publish_camera_odom( img_pose, message_time );
+        // // publish_track_img( op_track.m_debug_track_img, display_cost_time );
+        // publish_track_img( img_pose->m_raw_img, display_cost_time );
 
         if ( m_if_pub_raw_img )
         {

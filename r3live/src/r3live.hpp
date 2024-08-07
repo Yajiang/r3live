@@ -102,7 +102,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 
 #define INIT_TIME (0)
 // #define LASER_POINT_COV (0.0015) // Ori
-#define LASER_POINT_COV (0.01)    
+#define LASER_POINT_COV (0.2)    
 #define NUM_MATCH_POINTS (5)
 
 #define MAXN 360000
@@ -360,8 +360,8 @@ public:
             get_ros_parameter( m_ros_node_handle, "r3live_common/append_global_map_point_step", m_append_global_map_point_step, 4 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/recent_visited_voxel_activated_time", m_recent_visited_voxel_activated_time, 0.0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/maximum_image_buffer", m_maximum_image_buffer, 20000 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_minimum_depth", m_tracker_minimum_depth, 0.1 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_maximum_depth", m_tracker_maximum_depth, 200.0 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_minimum_depth", m_tracker_minimum_depth, 150.0 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_maximum_depth", m_tracker_maximum_depth, 500.0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/track_windows_size", m_track_windows_size, 40 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/minimum_pts_size", m_minumum_rgb_pts_size, 0.05 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/record_offline_map", m_if_record_mvs, 0 );

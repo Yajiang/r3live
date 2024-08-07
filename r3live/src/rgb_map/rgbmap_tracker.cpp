@@ -236,7 +236,10 @@ void Rgbmap_tracker::track_img( std::shared_ptr< Image_frame > &img_pose, double
     m_current_frame_time = img_pose->m_timestamp;
     m_map_rgb_pts_in_current_frame_pos.clear();
     if ( m_current_frame.empty() )
+    {
+        std::cout << "current frame is empty" << std::endl; 
         return;
+    }
     cv::Mat frame_gray = img_pose->m_img_gray;
     tim.tic( "HE" );
     tim.tic( "opTrack" );
@@ -247,6 +250,7 @@ void Rgbmap_tracker::track_img( std::shared_ptr< Image_frame > &img_pose, double
     if ( m_last_tracked_pts.size() < 30 )
     {
         m_last_frame_time = m_current_frame_time;
+        std::cout << "m last tracked pts is"<<m_last_tracked_pts.size() <<  "less than 30" << std::endl; 
         return;
     }
 
@@ -268,6 +272,7 @@ void Rgbmap_tracker::track_img( std::shared_ptr< Image_frame > &img_pose, double
 
     m_map_rgb_pts_in_current_frame_pos.clear();
     double frame_time_diff = ( m_current_frame_time - m_last_frame_time );
+    std::cout << "m_last_tracked_pts size " << m_last_tracked_pts.size() << std::endl;
     for ( uint i = 0; i < m_last_tracked_pts.size(); i++ )
     {
         if ( img_pose->if_2d_points_available( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y, 1.0, 0.05 ) )
@@ -326,6 +331,8 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp( std::shared_ptr< Image_fram
     std::vector< cv::Point3f > pt_3d_vec, pt_3d_vec_selected;
     std::vector< cv::Point2f > pt_2d_vec, pt_2d_vec_selected;
     std::vector< void * >      map_ptr_vec;
+
+    std::cout << "m_map_rgb_pts_in_current_frame_pos " << m_map_rgb_pts_in_current_frame_pos.size() << std::endl;
     for ( auto it = m_map_rgb_pts_in_current_frame_pos.begin(); it != m_map_rgb_pts_in_current_frame_pos.end(); it++ )
     {
         map_ptr_vec.push_back( it->first );
@@ -335,6 +342,7 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp( std::shared_ptr< Image_fram
     }
     if ( pt_3d_vec.size() < 10 )
     {
+        std::cout << "pt 3d vec size " << pt_3d_vec.size() << std::endl;
         return 0;
     }
     if ( 1 )
@@ -375,7 +383,7 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp( std::shared_ptr< Image_fram
     // eigen_q solver_q = Sophus::SO3d::exp(eigen_r_vec).unit_quaternion().inverse();
     eigen_q solver_q = Sophus::SO3d::exp( eigen_r_vec ).unit_quaternion().inverse();
     vec_3   solver_t = ( solver_q * eigen_t_vec ) * -1.0;
-    // cout << "Solve pose: " << solver_q.coeffs().transpose() << " | " << solver_t.transpose() << endl;
+    cout << "Solve pose: " << solver_q.coeffs().transpose() << " | " << solver_t.transpose() << endl;
     int    if_update = 1;
     double t_diff = ( solver_t - img_pose->m_pose_w2c_t ).norm();
     double r_diff = ( solver_q ).angularDistance( img_pose->m_pose_w2c_q ) * 57.3;
