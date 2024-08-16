@@ -2,7 +2,6 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <livox_ros_driver/CustomMsg.h>
-#include "../tools/tools_logger.hpp"
 
 using namespace std;
 
@@ -127,22 +126,22 @@ int main( int argc, char **argv )
     {
     case MID:
         printf( "MID40\n" );
-        sub_points = n.subscribe( "/livox/lidar", 1000, mid_handler, ros::TransportHints().tcpNoDelay() );
+        sub_points = n.subscribe( "/livox/lidar", 10000, mid_handler, ros::TransportHints().tcpNoDelay() );
         break;
 
     case HORIZON:
         printf( "HORIZON\n" );
-        sub_points = n.subscribe( "/livox/lidar", 1000, horizon_handler, ros::TransportHints().tcpNoDelay() );
+        sub_points = n.subscribe( "/livox/lidar", 10000, horizon_handler, ros::TransportHints().tcpNoDelay() );
         break;
 
     case VELO16:
         printf( "VELO16\n" );
-        sub_points = n.subscribe( "/velodyne_points", 1000, velo16_handler, ros::TransportHints().tcpNoDelay() );
+        sub_points = n.subscribe( "/velodyne_points", 10000, velo16_handler, ros::TransportHints().tcpNoDelay() );
         break;
 
     case OUST64:
         printf( "OUST64\n" );
-        sub_points = n.subscribe( "/os_cloud_node/points", 1000, oust64_handler, ros::TransportHints().tcpNoDelay() );
+        sub_points = n.subscribe( "/os_cloud_node/points", 10000, oust64_handler, ros::TransportHints().tcpNoDelay() );
         break;
 
     default:
@@ -151,9 +150,9 @@ int main( int argc, char **argv )
         break;
     }
 
-    pub_full = n.advertise< sensor_msgs::PointCloud2 >( "/laser_cloud", 100 );
-    pub_surf = n.advertise< sensor_msgs::PointCloud2 >( "/laser_cloud_flat", 100 );
-    pub_corn = n.advertise< sensor_msgs::PointCloud2 >( "/laser_cloud_sharp", 100 );
+    pub_full = n.advertise< sensor_msgs::PointCloud2 >( "/laser_cloud", 10000 );
+    pub_surf = n.advertise< sensor_msgs::PointCloud2 >( "/laser_cloud_flat", 10000 );
+    pub_corn = n.advertise< sensor_msgs::PointCloud2 >( "/laser_cloud_sharp", 10000 );
 
     ros::spin();
     return 0;

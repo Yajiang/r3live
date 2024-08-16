@@ -46,30 +46,18 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
-#include "stdio.h"
-#include "iostream"
 #include "string"
-#include <thread>
 #include <mutex>
 #include <Eigen/Eigen>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/eigen.hpp>
-#include "opencv2/features2d.hpp"
 // #include "opencv2/xfeatures2d.hpp"
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
 #include "tools_eigen.hpp"
-#include "tools_data_io.hpp"
-#include "tools_timer.hpp"
-#include "tools_logger.hpp"
-#include "tools_mem_used.h"
-#include "tools_openCV_3_to_4.hpp"
-#include "tools_serialization.hpp"
-
-#include "lib_sophus/so3.hpp"
-#include "lib_sophus/se3.hpp"
 //https://www.opencv-srf.com/2018/02/histogram-equalization.html
+#include <boost/serialization/access.hpp>
 
 inline char cv_wait_key(int ms )
 {
@@ -191,7 +179,7 @@ struct Image_frame
     void set_intrinsic(Eigen::Matrix3d & camera_K);
     Image_frame(Eigen::Matrix3d &camera_K);
     void init_cubic_interpolation();
-    void inverse_pose();    
+    // void inverse_pose();    
     void release_image();
     bool project_3d_to_2d( const pcl::PointXYZI & in_pt, Eigen::Matrix3d & cam_K, double &u, double &v, const double  & scale = 1.0);
     bool if_2d_points_available(const double &u, const double &v, const double &scale = 1.0, double fov_mar = -1.0);

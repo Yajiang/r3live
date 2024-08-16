@@ -162,7 +162,7 @@ void KD_TREE::start_thread(){
     pthread_mutex_init(&points_deleted_rebuild_mutex_lock, NULL); 
     pthread_mutex_init(&working_flag_mutex, NULL);
     pthread_mutex_init(&search_flag_mutex, NULL);
-    pthread_create(&rebuild_thread, NULL, multi_thread_ptr, (void*) this);
+    // pthread_create(&rebuild_thread, NULL, multi_thread_ptr, (void*) this);
     printf("Multi thread started \n");    
 }
 
@@ -998,14 +998,14 @@ void KD_TREE::Search_by_range(KD_TREE_NODE *root, BoxPointType boxpoint, PointVe
     if (boxpoint.vertex_min[0] <= root->point.x && boxpoint.vertex_max[0] > root->point.x && boxpoint.vertex_min[1] <= root->point.y && boxpoint.vertex_max[1] > root->point.y && boxpoint.vertex_min[2] <= root->point.z && boxpoint.vertex_max[2] > root->point.z){
         if (!root->point_deleted) Storage.push_back(root->point);
     }
-    if ((Rebuild_Ptr == nullptr) || root->left_son_ptr != *Rebuild_Ptr){
+    if (((Rebuild_Ptr == nullptr) || root->left_son_ptr != *Rebuild_Ptr)){
         Search_by_range(root->left_son_ptr, boxpoint, Storage);
     } else {
         pthread_mutex_lock(&search_flag_mutex);
         Search_by_range(root->left_son_ptr, boxpoint, Storage);
         pthread_mutex_unlock(&search_flag_mutex);
     }
-    if ((Rebuild_Ptr == nullptr) || root->right_son_ptr != *Rebuild_Ptr){
+    if (((Rebuild_Ptr == nullptr) || root->right_son_ptr != *Rebuild_Ptr)){
         Search_by_range(root->right_son_ptr, boxpoint, Storage);
     } else {
         pthread_mutex_lock(&search_flag_mutex);

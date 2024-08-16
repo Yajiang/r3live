@@ -46,10 +46,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  POSSIBILITY OF SUCH DAMAGE.
 */
 #include <omp.h>
-#include <mutex>
 #include <math.h>
-#include <thread>
-#include <fstream>
 #include <csignal>
 #include <unistd.h>
 #include <so3_math.h>
@@ -76,13 +73,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 
 #include "r3live.hpp"
 
-#include "loam/IMU_Processing.hpp"
 #include "tools_logger.hpp"
-#include "tools_color_printf.hpp"
-#include "tools_eigen.hpp"
-#include "tools_data_io.hpp"
-#include "tools_timer.hpp"
-#include "tools_openCV_3_to_4.hpp"
 
 Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;

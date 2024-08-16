@@ -544,6 +544,7 @@ int R3LIVE::service_LIO_update()
             std::this_thread::yield();
             std::this_thread::sleep_for( std::chrono::milliseconds( THREAD_SLEEP_TIM ) );
         }
+        // std::this_thread::sleep_for( std::chrono::milliseconds( 1000 ) );
         std::unique_lock< std::mutex > lock( m_mutex_lio_process );
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
 
@@ -602,13 +603,63 @@ int R3LIVE::service_LIO_update()
 #ifdef DEBUG_PRINT
             std::cout << "current lidar time " << Measures.lidar_beg_time << " "
                       << "first lidar time " << frame_first_pt_time << std::endl;
-            std::cout << "pre-integrated states: " << euler_cur.transpose() * 57.3 << " " << g_lio_state.pos_end.transpose() << " "
-                      << g_lio_state.vel_end.transpose() << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose()
-                      << std::endl;
+            // std::cout << "pre-integrated states: " << euler_cur.transpose() * 57.3 << " " << g_lio_state.pos_end.transpose() << " "
+            //           << g_lio_state.vel_end.transpose() << " " << g_lio_state.bias_g.transpose() << " " << g_lio_state.bias_a.transpose()
+            //           << std::endl;
+            std::cout << "pre-integrated states: " <<  g_lio_state.pos_end.transpose() << " "
+                      << g_lio_state.vel_end.transpose() << std::endl;
+            for(auto imu : Measures.imu)
+            {
+              std::cout << "imu acc: " <<std::setprecision(3) <<  imu->header.stamp << " "
+                        << imu->linear_acceleration.x << " " << imu->linear_acceleration.y  << " " << imu->linear_acceleration.z << std::endl;
+            }
 #endif
             // lasermap_fov_segment();
             downSizeFilterSurf.setInputCloud( feats_undistort );
             downSizeFilterSurf.filter( *feats_down );
+
+            // caculate variance of imu measure
+            {
+                Measures.smallMotion = true;
+                ROS_INFO("IMU Variance Caculation");
+                Eigen::Vector3d cur_acc(0, 0, 0);
+                Eigen::Vector3d cur_gyr(0, 0, 0);
+                Eigen::Vector3d mean_acc(0, 0, 0);
+                Eigen::Vector3d mean_gyr(0, 0, 0);
+                Eigen::Vector3d cov_acc(0, 0, 0);
+                Eigen::Vector3d cov_gyr(0, 0, 0);
+              int N = 0;
+
+              for (const auto &imu : Measures.imu) {
+                const auto &imu_acc = imu->linear_acceleration;
+                const auto &gyr_acc = imu->angular_velocity;
+                cur_acc << imu_acc.x, imu_acc.y, imu_acc.z;
+                cur_gyr << gyr_acc.x, gyr_acc.y, gyr_acc.z;
+
+                if (N == 0) {
+                  mean_acc += cur_acc;
+                  mean_gyr += cur_gyr;
+                } else {
+                  cov_acc =
+                      cov_acc * (N - 1.0) / N +
+                      (cur_acc - mean_acc).cwiseProduct(cur_acc - mean_acc) *
+                          (N - 1.0) / (N * N);
+                  cov_gyr =
+                      cov_gyr * (N - 1.0) / N +
+                      (cur_gyr - mean_gyr).cwiseProduct(cur_gyr - mean_gyr) *
+                          (N - 1.0) / (N * N);
+
+                  mean_acc += (cur_acc - mean_acc) / N;
+                  mean_gyr += (cur_gyr - mean_gyr) / N;
+                }
+                N++;
+              }
+              if (cov_acc.norm() > 10000) {
+                Measures.smallMotion = false;
+                std::cout << "cov_acc" << cov_acc << std::endl;
+              }
+            }
+
             // cout <<"Preprocess cost time: " << tim.toc("Preprocess") << endl;
             /*** initialize the map kdtree ***/
             if ( ( feats_down->points.size() > 1 ) && ( ikdtree.Root_Node == nullptr ) )
@@ -680,7 +731,6 @@ int R3LIVE::service_LIO_update()
                     laserCloudMap.header.frame_id = "world";
                     pubLaserCloudMap.publish( laserCloudMap );
                 }
-
                 std::vector< bool >               point_selected_surf( feats_down_size, true );
                 std::vector< std::vector< int > > pointSearchInd_surf( feats_down_size );
                 std::vector< PointVector >        Nearest_Points( feats_down_size );
@@ -700,13 +750,13 @@ int R3LIVE::service_LIO_update()
                     int norm_y = 0;
                     int norm_z = 0;
 
-                    std::cout << "state before optimize:" << std::endl;
-                    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
-                    // check_state(g_lio_state);
-                    StatesGroup::display(g_lio_state);
-                    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
-                    std::cout << "state before optimize:" << std::endl;
-                    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
+                    // std::cout << "state before optimize:" << std::endl;
+                    // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
+                    // // check_state(g_lio_state);
+                    // StatesGroup::display(g_lio_state);
+                    // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
+                    // std::cout << "state before optimize:" << std::endl;
+                    // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" << std::endl;
                     check_state(g_lio_state);
                     tim.tic( "Iter" );
                     match_start = omp_get_wtime();
@@ -952,6 +1002,10 @@ int R3LIVE::service_LIO_update()
                             g_lio_state.cov = ( I_STATE - G ) * g_lio_state.cov;
                             total_distance += ( g_lio_state.pos_end - position_last ).norm();
                             position_last = g_lio_state.pos_end;
+                            // for (int idx = 0; idx < 3 ; idx ++)
+                            // {
+                            //     g_lio_state.vel_end( idx ) = sigmoid_penalty(g_lio_state.vel_end( idx ),100);
+                            // }
 
                             // std::cout << "position: " << g_lio_state.pos_end.transpose() << " total distance: " << total_distance << std::endl;
                         }
@@ -1002,9 +1056,12 @@ int R3LIVE::service_LIO_update()
                     pointBodyToWorld( &( feats_down->points[ i ] ), &( feats_down_updated->points[ i ] ) );
                 }
                 t4 = omp_get_wtime();
-               
-                ikdtree.Add_Points( feats_down_updated->points, true );
-                
+
+                if(Measures.smallMotion)
+                {
+                  ikdtree.Add_Points(feats_down_updated->points, true);
+                }
+
                 kdtree_incremental_time = omp_get_wtime() - t4 + readd_time + readd_box_time + delete_box_time;
                 t5 = omp_get_wtime();
             }
@@ -1142,11 +1199,11 @@ int R3LIVE::service_LIO_update()
             time_log_counter++;
             fprintf( m_lio_costtime_fp, "%.5f %.5f\r\n", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time, t5 - t0 );
             fflush( m_lio_costtime_fp );
-            std::cout << "global state :" <<std::endl;
-            std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" <<std::endl;
-            // check_state(g_lio_state);
-            StatesGroup::display(g_lio_state);
-            std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" <<std::endl;
+            // std::cout << "global state :" <<std::endl;
+            // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" <<std::endl;
+            // // check_state(g_lio_state);
+            // StatesGroup::display(g_lio_state);
+            // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! :" <<std::endl;
         }
         status = ros::ok();
         rate.sleep();

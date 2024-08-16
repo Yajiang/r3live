@@ -2,9 +2,6 @@
 #include <cmath>
 #include <math.h>
 #include <deque>
-#include <mutex>
-#include <thread>
-#include <fstream>
 #include <csignal>
 #include <ros/ros.h>
 #include <so3_math.h>
@@ -13,7 +10,6 @@
 #include <pcl/common/io.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <condition_variable>
 #include <nav_msgs/Odometry.h>
 #include <pcl/common/transforms.h>
 #include <pcl/kdtree/kdtree_flann.h>
@@ -26,10 +22,11 @@
 #include <geometry_msgs/Vector3.h>
 
 /// *************Preconfiguration
-#define MAX_INI_COUNT (20)
+#define MAX_INI_COUNT (200)
 const inline bool time_list(PointType &x, PointType &y) {return (x.curvature < y.curvature);};
 bool check_state(StatesGroup &state_inout);
 void check_in_out_state(const StatesGroup &state_in, StatesGroup &state_inout);
+float sigmoid_penalty(float x, float range);
 
 extern double g_imu_scale_factor;
 

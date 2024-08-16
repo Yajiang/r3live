@@ -50,7 +50,6 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <mutex>
 #include <math.h>
 #include <thread>
-#include <fstream>
 #include <csignal>
 #include <unistd.h>
 #include <so3_math.h>
@@ -79,13 +78,9 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <opencv2/highgui/highgui.hpp>
 #include <cv_bridge/cv_bridge.h>
 
-#include "lib_sophus/so3.hpp"
-#include "lib_sophus/se3.hpp"
-
 #include "tools_logger.hpp"
 #include "tools_color_printf.hpp"
 #include "tools_eigen.hpp"
-#include "tools_data_io.hpp"
 #include "tools_timer.hpp"
 #include "tools_thread_pool.hpp"
 #include "tools_ros.hpp"
@@ -102,7 +97,9 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 
 #define INIT_TIME (0)
 // #define LASER_POINT_COV (0.0015) // Ori
-#define LASER_POINT_COV (0.2)    
+// #define LASER_POINT_COV (0.2)    
+// #define LASER_POINT_COV (0.001)    
+#define LASER_POINT_COV (0.01)    
 #define NUM_MATCH_POINTS (5)
 
 #define MAXN 360000
@@ -265,8 +262,8 @@ public:
     int m_if_record_mvs = 0;
     cv::Mat intrinsic, dist_coeffs;
 
-    mat_3_3 m_inital_rot_ext_i2c;
-    vec_3  m_inital_pos_ext_i2c;
+    mat_3_3 m_inital_rot_ext_c2i;
+    vec_3  m_inital_pos_ext_c2i;
     Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m_camera_intrinsic;
     Eigen::Matrix<double, 5, 1> m_camera_dist_coeffs;
     Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m_camera_ext_R;

@@ -17,10 +17,7 @@
 #include "tools_color_printf.hpp"
 #include "tools_eigen.hpp"
 #include "tools_ros.hpp"
-#include <queue>
 #include <deque>
-#include "lib_sophus/se3.hpp"
-#include "lib_sophus/so3.hpp"
 #define DEBUG_PRINT
 #define USE_ikdtree
 #define ESTIMATE_GRAVITY  1
@@ -61,7 +58,8 @@ static const Eigen::Vector3f Zero3f(0, 0, 0);
 // Eigen::Vector3d Lidar_offset_to_IMU(0.05512, 0.02226, 0.0297); // Horizon
 // static const Eigen::Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
 // static const Eigen::Vector3d Lidar_offset_to_IMU(-0.03886, 0.0046, 0.03346); // POP3
-static const Eigen::Vector3d Lidar_offset_to_IMU(-38.86, 4.6, 33.46); // POP3
+// static const Eigen::Vector3d Lidar_offset_to_IMU(-38.86, 4.6, 33.46); // POP3
+static Eigen::Vector3d Lidar_offset_to_IMU(-38.86, 4.6, 33.46); // POP3
 
 struct Pose6D
 {
@@ -308,6 +306,7 @@ struct MeasureGroup // Lidar data and imu dates for the curent process
     double lidar_end_time;
     PointCloudXYZINormal::Ptr lidar;
     std::deque<sensor_msgs::Imu::ConstPtr> imu;
+    bool smallMotion = true;
 };
 
 struct StatesGroup
@@ -323,13 +322,13 @@ public:
     Eigen::Vector3d bias_a;                                  // [12-14] accelerator bias
     Eigen::Vector3d gravity;                                 // [15-17] the estimated gravity acceleration
 
-    Eigen::Matrix3d rot_ext_i2c;                             // [18-20] Extrinsic between IMU frame to Camera frame on rotation.
-    Eigen::Vector3d pos_ext_i2c;                             // [21-23] Extrinsic between IMU frame to Camera frame on position.
-    double          td_ext_i2c_delta;                        // [24]    Extrinsic between IMU frame to Camera frame on position.
+    Eigen::Matrix3d rot_ext_c2i;                             // [18-20] Extrinsic between IMU frame to Camera frame on rotation.
+    Eigen::Vector3d pos_ext_c2i;                             // [21-23] Extrinsic between IMU frame to Camera frame on position.
+    double          td_ext_c2i_delta;                        // [24]    Extrinsic between IMU frame to Camera frame on position.
     vec_4           cam_intrinsic;                           // [25-28] Intrinsice of camera [fx, fy, cx, cy]
     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov; // states covariance
     double last_update_time = 0;
-    double          td_ext_i2c;
+    double          td_ext_c2i;
     StatesGroup()
     {
         rot_end = Eigen::Matrix3d::Identity();
@@ -341,14 +340,14 @@ public:
         gravity = Eigen::Vector3d(0.0, -G_m_s2, 0.0);
 
         //Ext camera w.r.t. IMU
-        rot_ext_i2c = Eigen::Matrix3d::Identity();
-        pos_ext_i2c = vec_3::Zero();
+        rot_ext_c2i = Eigen::Matrix3d::Identity();
+        pos_ext_c2i = vec_3::Zero();
 
         cov = Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity() * INIT_COV;
         // cov.block(18, 18, 6,6) *= 0.1;
         last_update_time = 0;
-        td_ext_i2c_delta = 0;
-        td_ext_i2c = 0;
+        td_ext_c2i_delta = 0;
+        td_ext_c2i = 0;
     }
 
     ~StatesGroup(){}
@@ -370,9 +369,9 @@ public:
         a.last_update_time = this->last_update_time;
 #if ENABLE_CAMERA_OBS                
         //Ext camera w.r.t. IMU
-        a.rot_ext_i2c = this->rot_ext_i2c * Exp(  state_add(18), state_add(19), state_add(20) );
-        a.pos_ext_i2c = this->pos_ext_i2c + state_add.block<3,1>( 21, 0 );
-        a.td_ext_i2c_delta = this->td_ext_i2c_delta + state_add(24);
+        a.rot_ext_c2i = this->rot_ext_c2i * Exp(  state_add(18), state_add(19), state_add(20) );
+        a.pos_ext_c2i = this->pos_ext_c2i + state_add.block<3,1>( 21, 0 );
+        a.td_ext_c2i_delta = this->td_ext_c2i_delta + state_add(24);
         a.cam_intrinsic = this->cam_intrinsic + state_add.block(25, 0, 4, 1);
 #endif
         return a;
@@ -390,9 +389,9 @@ public:
 #endif
 #if ENABLE_CAMERA_OBS        
         //Ext camera w.r.t. IMU
-        this->rot_ext_i2c = this->rot_ext_i2c * Exp(  state_add(18), state_add(19), state_add(20));
-        this->pos_ext_i2c = this->pos_ext_i2c + state_add.block<3,1>( 21, 0 );
-        this->td_ext_i2c_delta = this->td_ext_i2c_delta + state_add(24);
+        this->rot_ext_c2i = this->rot_ext_c2i * Exp(  state_add(18), state_add(19), state_add(20));
+        this->pos_ext_c2i = this->pos_ext_c2i + state_add.block<3,1>( 21, 0 );
+        this->td_ext_c2i_delta = this->td_ext_c2i_delta + state_add(24);
         this->cam_intrinsic = this->cam_intrinsic + state_add.block(25, 0, 4, 1);   
 #endif
         return *this;
@@ -411,10 +410,10 @@ public:
 
 #if ENABLE_CAMERA_OBS    
         //Ext camera w.r.t. IMU
-        Eigen::Matrix3d rotd_ext_i2c(b.rot_ext_i2c.transpose() * this->rot_ext_i2c);
-        a.block<3, 1>(18, 0) = SO3_LOG(rotd_ext_i2c);
-        a.block<3, 1>(21, 0) = this->pos_ext_i2c - b.pos_ext_i2c;
-        a(24) = this->td_ext_i2c_delta - b.td_ext_i2c_delta;
+        Eigen::Matrix3d rotd_ext_c2i(b.rot_ext_c2i.transpose() * this->rot_ext_c2i);
+        a.block<3, 1>(18, 0) = SO3_LOG(rotd_ext_c2i);
+        a.block<3, 1>(21, 0) = this->pos_ext_c2i - b.pos_ext_c2i;
+        a(24) = this->td_ext_c2i_delta - b.td_ext_c2i_delta;
         a.block<4, 1>(25, 0) = this->cam_intrinsic - b.cam_intrinsic;
 #endif
         return a;

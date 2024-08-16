@@ -45,7 +45,12 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
 */
+
+#include <thread>
+#include <iostream>
 #include "image_frame.hpp"
+#include "tools_color_printf.hpp"
+#include "tools_data_io.hpp"
 
 Image_frame::Image_frame()
 {
@@ -71,6 +76,7 @@ void Image_frame::refresh_pose_for_projection()
 {
     m_pose_c2w_q = m_pose_w2c_q.inverse();
     m_pose_c2w_t = -(m_pose_w2c_q.inverse() * m_pose_w2c_t);
+    std::cout << "pose refresh: " << m_pose_c2w_t.transpose() << std::endl;
     m_if_have_set_pose = 1;
 }
 
@@ -78,6 +84,7 @@ void Image_frame::set_pose(const eigen_q &pose_w2c_q, const vec_3 &pose_w2c_t)
 {
     m_pose_w2c_q = pose_w2c_q;
     m_pose_w2c_t = pose_w2c_t;
+
     refresh_pose_for_projection();
 }
 
@@ -119,15 +126,15 @@ void Image_frame::init_cubic_interpolation()
 #endif
 }
 
-void Image_frame::inverse_pose()
-{
-    m_pose_w2c_t = -(m_pose_w2c_q.inverse() * m_pose_w2c_t);
-    m_pose_w2c_q = m_pose_w2c_q.inverse();
-    m_pose_w2c_R = m_pose_w2c_q.toRotationMatrix();
+// void Image_frame::inverse_pose()
+// {
+//     m_pose_w2c_t = -(m_pose_w2c_q.inverse() * m_pose_w2c_t);
+//     m_pose_w2c_q = m_pose_w2c_q.inverse();
+//     m_pose_w2c_R = m_pose_w2c_q.toRotationMatrix();
 
-    m_pose_c2w_q = m_pose_w2c_q.inverse();
-    m_pose_c2w_t = -(m_pose_w2c_q.inverse() * m_pose_w2c_t);
-}
+//     m_pose_c2w_q = m_pose_w2c_q.inverse();
+//     m_pose_c2w_t = -(m_pose_w2c_q.inverse() * m_pose_w2c_t);
+// }
 
 bool Image_frame::project_3d_to_2d(const pcl::PointXYZI & in_pt, Eigen::Matrix3d &cam_K, double &u, double &v, const double &scale)
 {
@@ -148,7 +155,9 @@ bool Image_frame::project_3d_to_2d(const pcl::PointXYZI & in_pt, Eigen::Matrix3d
 
     vec_3 pt_w(in_pt.x, in_pt.y, in_pt.z), pt_cam;
     // pt_cam = (m_pose_w2c_q.inverse() * pt_w - m_pose_w2c_q.inverse()*m_pose_w2c_t);
-    pt_cam = (m_pose_c2w_q * pt_w + m_pose_c2w_t);
+    // std::cout << "m_pose_c2w_t: " << m_pose_c2w_t.transpose() << std::endl;
+    // pt_cam = (m_pose_c2w_q * pt_w + m_pose_c2w_t);
+    pt_cam = (m_pose_w2c_q * pt_w + m_pose_w2c_t);
     if (pt_cam(2) < 0.001)
     {
         return false;

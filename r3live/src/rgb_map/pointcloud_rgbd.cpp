@@ -347,6 +347,7 @@ int Global_map::append_points_to_global_map(pcl::PointCloud<T> &pc_in, double  a
         acc++;
         std::shared_ptr<RGB_pts> pt_rgb = std::make_shared<RGB_pts>();
         pt_rgb->set_pos(vec_3(pc_in.points[pt_idx].x, pc_in.points[pt_idx].y, pc_in.points[pt_idx].z));
+        // pt_rgb->set_pos(vec_3(grid_x*m_minimum_pts_size,grid_y*m_minimum_pts_size,grid_z*m_minimum_pts_size));
         pt_rgb->m_pt_index = m_rgb_pts_vec.size();
         m_rgb_pts_vec.push_back(pt_rgb);
         m_hashmap_3d_pts.insert(grid_x, grid_y, grid_z, pt_rgb);

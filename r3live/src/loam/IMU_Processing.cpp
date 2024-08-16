@@ -1,22 +1,21 @@
+#include <cmath>
 #include "IMU_Processing.hpp"
 #define COV_OMEGA_NOISE_DIAG 1e-1
 // #define COV_ACC_NOISE_DIAG 0.4
-#define COV_ACC_NOISE_DIAG 360
-#define COV_GYRO_NOISE_DIAG 0.02
+#define COV_ACC_NOISE_DIAG 225
+#define COV_GYRO_NOISE_DIAG 0.012
 
 // #define COV_BIAS_ACC_NOISE_DIAG 1
-#define COV_BIAS_ACC_NOISE_DIAG 4
+#define COV_BIAS_ACC_NOISE_DIAG 0.01
 // #define COV_BIAS_GYRO_NOISE_DIAG 0.1
-#define COV_BIAS_GYRO_NOISE_DIAG 0.001
+#define COV_BIAS_GYRO_NOISE_DIAG 0.0001
 
 // #define COV_START_ACC_DIAG 1e-1
-#define COV_START_ACC_DIAG 360
-#define COV_START_GYRO_DIAG 3e-6
+#define COV_START_ACC_DIAG 2000
+#define COV_START_GYRO_DIAG 3e-3
 // #define COV_NOISE_EXT_I2C_R (0.0 * 1e-3)
 // #define COV_NOISE_EXT_I2C_T (0.0 * 1e-3)
 // #define COV_NOISE_EXT_I2C_Td (0.0 * 1e-3)
-
-
 
 double g_lidar_star_tim = 0;
 double g_imu_scale_factor = 1.00352;
@@ -110,21 +109,31 @@ void ImuProcess::IMU_Initial( const MeasureGroup &meas, StatesGroup &state_inout
     // g_imu_scale_factor =  mean_acc.norm() / G_m_s2;
     // mean_acc *= 1.0 / g_imu_scale_factor;
     // std::cout << "g_imu_scale_factor" << g_imu_scale_factor << std::endl;
+    if(cov_acc.norm() > 20000)
+    {
+      std::cout << "cov_acc" << cov_acc << std::endl;
+      std::cout << "cov_gyro" << cov_gyr << std::endl;
+      std::cout << "bias_a" << state_inout.bias_a << std::endl;
+      Reset();
+    }
+    else
+    {
+      // TODO: fix the cov
+      // cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG,
+      // COV_START_ACC_DIAG ); cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG,
+      // COV_START_GYRO_DIAG, COV_START_GYRO_DIAG ); state_inout.gravity =
+      // Eigen::Vector3d( 0, 0, 9805 ); state_inout.gravity = Eigen::Vector3d(
+      // 0, -G_m_s2, 0 ); we assume at the beginning, imu is almost static
+      state_inout.gravity = mean_acc / mean_acc.norm() * G_m_s2;
+      state_inout.bias_a = mean_acc - state_inout.gravity;
+      state_inout.rot_end = Eye3d;
+      state_inout.bias_g = mean_gyr;
 
-    // TODO: fix the cov
-    // cov_acc = Eigen::Vector3d( COV_START_ACC_DIAG, COV_START_ACC_DIAG, COV_START_ACC_DIAG );
-    // cov_gyr = Eigen::Vector3d( COV_START_GYRO_DIAG, COV_START_GYRO_DIAG, COV_START_GYRO_DIAG );
-    // state_inout.gravity = Eigen::Vector3d( 0, 0, 9805 );
-    // state_inout.gravity = Eigen::Vector3d( 0, -G_m_s2, 0 );
-    // we assume at the beginning, imu is almost static
-    state_inout.gravity = mean_acc / mean_acc.norm() * G_m_s2;
-    state_inout.bias_a = mean_acc - state_inout.gravity;
-    state_inout.rot_end = Eye3d;
-    state_inout.bias_g = mean_gyr;
+      std::cout << "cov_acc" << cov_acc << std::endl;
+      std::cout << "cov_gyro" << cov_gyr << std::endl;
+      std::cout << "bias_a" << state_inout.bias_a << std::endl;
+    }
 
-    std::cout << "cov_acc" << cov_acc <<std::endl;
-    std::cout << "cov_gyro" << cov_gyr <<std::endl;
-    std::cout << "bias_a" << state_inout.bias_a <<std::endl;
 }
 
 void ImuProcess::lic_state_propagate( const MeasureGroup &meas, StatesGroup &state_inout )
@@ -146,30 +155,53 @@ void ImuProcess::lic_state_propagate( const MeasureGroup &meas, StatesGroup &sta
     last_imu_ = meas.imu.back();
 }
 
+float sigmoid_penalty(float x, float range)
+{
+    auto input = x  / range;
+    auto output = range * (1 / (1 + exp(-input)) - 0.5);
+    return output;
+}
+
+
 // Avoid abnormal state input
 bool check_state( StatesGroup &state_inout )
 {
     bool is_fail = false;
-    for ( int idx = 0; idx < 3; idx++ )
-    {
-        if ( fabs( state_inout.vel_end( idx ) ) > 1000)
-        {
-            is_fail = true;
-            scope_color( ANSI_COLOR_RED_BG );
-            for ( int i = 0; i < 10; i++ )
-            {
-                cout << __FILE__ << ", " << __LINE__ << ", check_state fail !!!! " << state_inout.vel_end.transpose() << endl;
-            }
-            state_inout.vel_end( idx ) = 0.0;
-        }
-        else
-        {
-            for ( int i = 0; i < 10; i++ )
-            {
-                // cout << __FILE__ << ", " << __LINE__ << ", check_state !!!! " << state_inout.pos_end.transpose() << endl;
-            }
-        }
-    }
+    // {
+    //     scope_color( ANSI_COLOR_BLUE_BG);
+    //     cout << __FILE__ << ", " << __LINE__ << ", before penalty !!!! " << state_inout.vel_end.transpose() << endl;
+    // }
+
+    // for (int idx = 0; idx < 3 ; idx ++)
+    // {
+    //     state_inout.vel_end( idx ) = sigmoid_penalty(state_inout.vel_end( idx ),100);
+    // }
+
+    // {
+    //     scope_color( ANSI_COLOR_RED_BG );
+    //     cout << __FILE__ << ", " << __LINE__ << ", after penalty !!!! " << state_inout.vel_end.transpose() << endl;
+    // }
+
+    // for ( int idx = 0; idx < 3; idx++ )
+    // {
+    //     if ( fabs( state_inout.vel_end( idx ) ) > 30)
+    //     {
+    //         is_fail = true;
+    //         scope_color( ANSI_COLOR_RED_BG );
+    //         // for ( int i = 0; i < 10; i++ )
+    //         // {
+    //         //     cout << __FILE__ << ", " << __LINE__ << ", check_state fail !!!! " << state_inout.vel_end.transpose() << endl;
+    //         // }
+    //         // state_inout.vel_end( idx ) = 0.0;
+    //     }
+    //     else
+    //     {
+    //         for ( int i = 0; i < 5; i++ )
+    //         {
+    //             cout << __FILE__ << ", " << __LINE__ << ", check_state !!!! " << state_inout.pos_end.transpose() << endl;
+    //         }
+    //     }
+    // }
     return is_fail;
 }
 
@@ -534,5 +566,5 @@ void ImuProcess::Process( MeasureGroup &meas, StatesGroup &stat, PointCloudXYZIN
     // t3 = omp_get_wtime();
 
     // std::cout<<"[ IMU Process ]: Time: "<<t3 - t1<<std::endl;
-    std::cout << "pointcloud size after : " << meas.lidar->size() << std::endl;
+    // std::cout << "pointcloud size after : " << meas.lidar->size() << std::endl;
 }

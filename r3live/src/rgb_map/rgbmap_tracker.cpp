@@ -46,6 +46,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  POSSIBILITY OF SUCH DAMAGE.
 */
 #include "rgbmap_tracker.hpp"
+#include "lib_sophus/so3.hpp"
 
 Rgbmap_tracker::Rgbmap_tracker()
 {
@@ -350,7 +351,9 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp( std::shared_ptr< Image_fram
         std::vector< int > status;
         try
         {
-            cv::solvePnPRansac( pt_3d_vec, pt_2d_vec, m_intrinsic, cv::Mat(), r_vec, t_vec, false, 200, 1.5, 0.99,
+            // cv::solvePnPRansac( pt_3d_vec, pt_2d_vec, m_intrinsic, cv::Mat(), r_vec, t_vec, false, 200, 1.5, 0.99,
+            //                     status ); // SOLVEPNP_ITERATIVE
+            cv::solvePnPRansac( pt_3d_vec, pt_2d_vec, m_intrinsic, cv::Mat(), r_vec, t_vec, false, 200, 5, 0.99,
                                 status ); // SOLVEPNP_ITERATIVE
         }
         catch ( cv::Exception &e )
@@ -381,8 +384,21 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp( std::shared_ptr< Image_fram
     cv::cv2eigen( r_vec, eigen_r_vec );
     cv::cv2eigen( t_vec, eigen_t_vec );
     // eigen_q solver_q = Sophus::SO3d::exp(eigen_r_vec).unit_quaternion().inverse();
-    eigen_q solver_q = Sophus::SO3d::exp( eigen_r_vec ).unit_quaternion().inverse();
-    vec_3   solver_t = ( solver_q * eigen_t_vec ) * -1.0;
+    // eigen_q solver_q = Sophus::SO3d::exp( eigen_r_vec ).unit_quaternion().inverse();
+    // vec_3   solver_t = ( solver_q * eigen_t_vec ) * -1.0;
+    eigen_q solver_q = Sophus::SO3d::exp( eigen_r_vec ).unit_quaternion();
+    vec_3   solver_t = eigen_t_vec;
+    std::cout << "point size : " << pt_3d_vec.size() << std::endl;
+    // for (auto point : pt_3d_vec)
+    // {
+    //     std::cout << " ========================================3d================================================ "<< std::endl;
+    //     std::cout << "  " <<point << std::endl;
+    // }
+    // for (auto point : pt_2d_vec)
+    // {
+    //     std::cout << " ========================================2d================================================ "<< std::endl;
+    //     std::cout << "  " <<point << std::endl;
+    // }
     cout << "Solve pose: " << solver_q.coeffs().transpose() << " | " << solver_t.transpose() << endl;
     int    if_update = 1;
     double t_diff = ( solver_t - img_pose->m_pose_w2c_t ).norm();
@@ -390,9 +406,8 @@ int Rgbmap_tracker::remove_outlier_using_ransac_pnp( std::shared_ptr< Image_fram
     
     if_update = 1;
     t_last_estimated = solver_t;
-    if ( if_update )
+    if ( t_diff < 3 && r_diff < 1.0 )
     {
-
         img_pose->m_pnp_pose_w2c_q = solver_q;
         img_pose->m_pnp_pose_w2c_t = solver_t;
 

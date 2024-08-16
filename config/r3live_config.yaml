@@ -12,13 +12,16 @@ Lidar_front_end:
 r3live_common:
    if_dump_log: 0                   # If recording ESIKF update log. [default = 0]
    record_offline_map: 1            # If recording offline map. [default = 1]
-   pub_pt_minimum_views: 5          # Publish points which have been render up to "pub_pt_minimum_views" time. [default = 3]
-   minimum_pts_size: 2          # The minimum distance for every two points in Global map (unit in meter). [default = 0.01] 
-   image_downsample_ratio: 1        # The downsample ratio of the input image. [default = 1]
-   estimate_i2c_extrinsic: 1        # If enable estimate the extrinsic between camera and IMU. [default = 1] 
-   estimate_intrinsic: 1            # If enable estimate the online intrinsic calibration of the camera lens. [default = 1] 
-   maximum_vio_tracked_pts: 600     # The maximum points for tracking. [default = 600]
+   pub_pt_minimum_views: 3          # Publish points which have been render up to "pub_pt_minimum_views" time. [default = 3]
+   minimum_pts_size: 0.1         # The minimum distance for every two points in Global map (unit in meter). [default = 0.01] 
+   image_downsample_ratio: 2        # The downsample ratio of the input image. [default = 1]
+   estimate_i2c_extrinsic: 0        # If enable estimate the extrinsic between camera and IMU. [default = 1] 
+   estimate_intrinsic: 0            # If enable estimate the online intrinsic calibration of the camera lens. [default = 1] 
+   maximum_vio_tracked_pts: 800     # The maximum points for tracking. [default = 600]
    append_global_map_point_step: 4  # The point step of append point to global map. [default = 4]
+   esikf_iter_times: 5
+   tracker_minimum_depth: 50
+   tracker_maximum_depth: 600
 
 r3live_vio:
    # image_width: 640
@@ -29,11 +32,15 @@ r3live_vio:
    #    0, 0, 1]
    image_width: 1280
    image_height: 800
+   # camera_intrinsic:
+   #    [1729.841, 0, 646.1222, 
+   #    0, 1729.841, 399.2832, 
+   #    0, 0, 1]
    camera_intrinsic:
-      [1729.841, 0, 646.1222, 
-      0, 1729.841, 399.2832, 
+      [1756.4810604040586, 0, 606.0448272539736, 
+      0, 1755.7787277054201, 368.17294190234617, 
       0, 0, 1]
-   camera_dist_coeffs: [0.0, 0.0, 0.0, 0.0, 0.0]  #k1, k2, p1, p2, k3
+   camera_dist_coeffs: [0.15639509049591974, -0.1156655291904492, -0.004680103361942233,-0.012271549650261422, 0]  #k1, k2, p1, p2, k3
    camera_ext_R:
       [0.9946953, -0.006869899, -0.1026354, 0.004445582, 0.9997061, -0.02383076, 0.102769, 0.02324807, 0.9944335]
    camera_ext_t: [-14.71654, -0.5411173, 1.297083]
@@ -59,6 +66,6 @@ r3live_lio:
    lidar_time_delay: 0.0       # The time-offset between LiDAR and IMU, provided by user. 
    filter_size_map: 1
    publish_feature_map: true
-   voxel_downsample_size_surf: 0.2
+   voxel_downsample_size_surf: 0.5
    planar_check_dis: 0.2
-   maximum_pt_kdtree_dis: 3
+   maximum_pt_kdtree_dis: 2

@@ -56,15 +56,11 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #ifndef __TOOLS_EIGEN_HPP__
 #define __TOOLS_EIGEN_HPP__
 #include <Eigen/Eigen>
-#include "tools_color_printf.hpp"
 
 // For the consideration of avoiding alignment error while running, we prefer using datatype of Eigen with no alignment.
 // In addition, for higher realtime performance (don't expect too much), you can modify the option with alignment, but you might carefully be aware of the crash of the program.
 #define EIGEN_DATA_TYPE_DEFAULT_OPTION Eigen::DontAlign
 // #define EIGEN_DATA_TYPE_DEFAULT_OPTION Eigen::AutoAlign
-
-template < int M, int N, int option = (EIGEN_DATA_TYPE_DEFAULT_OPTION|Eigen::RowMajor) >
-using eigen_mat_d = Eigen::Matrix< double, M, N, option >;
 
 template < int M, int N, int option = (EIGEN_DATA_TYPE_DEFAULT_OPTION|Eigen::RowMajor) >
 using eigen_mat_d = Eigen::Matrix< double, M, N, option >;

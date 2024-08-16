@@ -47,8 +47,8 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 */
 #ifndef __TOOLS_COLOR_PRINT_HPP__
 #define __TOOLS_COLOR_PRINT_HPP__
-#include <stdio.h>
-#include <string.h>
+#include <iostream>
+#include <string>
 /*
  * Make screen print colorful :)
  * Author: Jiarong Lin

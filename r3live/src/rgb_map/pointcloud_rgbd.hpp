@@ -46,7 +46,6 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
  POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
-#include <atomic>
 #include <unordered_set>
 #include "tools_logger.hpp"
 #include "opencv2/opencv.hpp"
@@ -54,6 +53,7 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include "tools_kd_hash.hpp"
 #include "tools_thread_pool.hpp"
 #include "tools_serialization.hpp"
+#include "common_tools.h"
 // #include "assert.h"
 #define R3LIVE_MAP_MAJOR_VERSION 1
 #define R3LIVE_MAP_MINOR_VERSION 0

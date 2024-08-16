@@ -57,10 +57,9 @@ Dr. Fu Zhang < fuzhang@hku.hk >.
 #include <stdarg.h> //need for such like printf(...)
 #include <stdio.h>
 #include <string>
-#include <thread>
-#include <iomanip>
+#include <string.h>
+#include <memory>
 #include "tools_color_printf.hpp"
-#include "tools_timer.hpp"
 // #define FILE_LOGGER_VERSION      "V1.0"
 // #define FILE_LOGGER_VERSION_INFO "First version"
 
