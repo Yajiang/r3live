@@ -16,7 +16,7 @@ void dump_lio_state_to_log( FILE *fp )
     {
         Eigen::Vector3d rot_angle = Sophus::SO3d( Eigen::Quaterniond( g_lio_state.rot_end ) ).log();
         Eigen::Vector3d rot_ext_c2i_angle = Sophus::SO3d( Eigen::Quaterniond( g_lio_state.rot_ext_c2i ) ).log();
-        fprintf( fp, "%lf ", g_lio_state.last_update_time - g_camera_lidar_queue.m_first_imu_time ); // Time   [0]
+        fprintf( fp, "%lf ", g_lio_state.lastUpdateTime - g_camera_lidar_queue.m_first_imu_time ); // Time   [0]
         fprintf( fp, "%lf %lf %lf ", rot_angle( 0 ), rot_angle( 1 ), rot_angle( 2 ) );               // Angle  [1-3]
         fprintf( fp, "%lf %lf %lf ", g_lio_state.pos_end( 0 ), g_lio_state.pos_end( 1 ),
                  g_lio_state.pos_end( 2 ) );          // Pos    [4-6]
@@ -34,8 +34,8 @@ void dump_lio_state_to_log( FILE *fp )
                  rot_ext_c2i_angle( 2 ) ); // Rot_ext_i2c[25-27]
         fprintf( fp, "%lf %lf %lf ", g_lio_state.pos_ext_c2i( 0 ), g_lio_state.pos_ext_c2i( 1 ),
                  g_lio_state.pos_ext_c2i( 2 ) ); // pos_ext_c2i [28-30]
-        fprintf( fp, "%lf %lf %lf %lf ", g_lio_state.cam_intrinsic( 0 ), g_lio_state.cam_intrinsic( 1 ), g_lio_state.cam_intrinsic( 2 ),
-                 g_lio_state.cam_intrinsic( 3 ) );     // Camera Intrinsic [31-34]
+        fprintf( fp, "%lf %lf %lf %lf ", g_lio_state.camIntrinsic( 0 ), g_lio_state.camIntrinsic( 1 ), g_lio_state.camIntrinsic( 2 ),
+                 g_lio_state.camIntrinsic( 3 ) );     // Camera Intrinsic [31-34]
         fprintf( fp, "%lf ", g_lio_state.td_ext_c2i ); // Camera Intrinsic [35]
         // cout <<  g_lio_state.cov.diagonal().transpose() << endl;
         // cout <<  g_lio_state.cov.block(0,0,3,3) << endl;
@@ -86,7 +86,7 @@ void IMUFusion::print_dash_board()
     append_space_to_bits( out_str_line_2, 28 );
     out_str_line_2.append( "|    " ).append( std::to_string( g_camera_frame_idx ) );
     append_space_to_bits( out_str_line_2, 43 );
-    out_str_line_2.append( "| " ).append( std::to_string( m_map_rgb_pts.m_rgb_pts_vec.size() ) );
+    out_str_line_2.append( "| " ).append( std::to_string( m_mapColorPoints.m_ColorPointsVec.size() ) );
     append_space_to_bits( out_str_line_2, 58 );
     out_str_line_2.append( "|    " ).append( std::to_string( mem_used_mb ) );
 
@@ -107,7 +107,7 @@ void IMUFusion::print_dash_board()
     ANSI_SCREEN_FLUSH;
 }
 
-void IMUFusion::set_initial_state_cov( StatesGroup &state )
+void IMUFusion::setInitialStateCov( StatesGroup &state )
 {
     // Set cov
     scope_color( ANSI_COLOR_RED_BOLD );
@@ -139,26 +139,8 @@ void IMUFusion::set_initial_state_cov( StatesGroup &state )
     // state.cov.block( 25, 25, 4, 4 ) = state.cov.block( 25, 25, 4, 4 ).setIdentity() *  1e-3; // Camera intrinsic.
 }
 
-cv::Mat IMUFusion::generate_control_panel_img()
-{
-    int     line_y = 40;
-    int     padding_x = 10;
-    int     padding_y = line_y * 0.7;
-    cv::Mat res_image = cv::Mat( line_y * 3 + 1 * padding_y, 960, CV_8UC3, cv::Scalar::all( 0 ) );
-    char    temp_char[ 128 ];
-    sprintf( temp_char, "Click this windows to enable the keyboard controls." );
-    cv::putText( res_image, std::string( temp_char ), cv::Point( padding_x, line_y * 0 + padding_y ), cv::FONT_HERSHEY_COMPLEX, 1,
-                 cv::Scalar( 0, 255, 255 ), 2, 8, 0 );
-    sprintf( temp_char, "Press 'S' or 's' key to save current map" );
-    cv::putText( res_image, std::string( temp_char ), cv::Point( padding_x, line_y * 1 + padding_y ), cv::FONT_HERSHEY_COMPLEX, 1,
-                 cv::Scalar( 255, 255, 255 ), 2, 8, 0 );
-    sprintf( temp_char, "Press 'space' key to pause the mapping process" );
-    cv::putText( res_image, std::string( temp_char ), cv::Point( padding_x, line_y * 2 + padding_y ), cv::FONT_HERSHEY_COMPLEX, 1,
-                 cv::Scalar( 255, 255, 255 ), 2, 8, 0 );
-    return res_image;
-}
 
-void IMUFusion::set_initial_camera_parameter( StatesGroup &state, double *intrinsic_data, double *camera_dist_data, double *imu_camera_ext_R,
+void IMUFusion::setInitialCameraParameter( StatesGroup &state, double *intrinsic_data, double *camera_dist_data, double *imu_camera_ext_R,
                                            double *imu_camera_ext_t, double cam_k_scale )
 {
     scope_color( ANSI_COLOR_YELLOW_BOLD );
@@ -178,15 +160,15 @@ void IMUFusion::set_initial_camera_parameter( StatesGroup &state, double *intrin
 
     m_inital_rot_ext_c2i = state.rot_ext_c2i;
     m_inital_pos_ext_c2i = state.pos_ext_c2i;
-    state.cam_intrinsic( 0 ) = g_cam_K( 0, 0 ) ;
-    state.cam_intrinsic( 1 ) = g_cam_K( 1, 1 ) ;
-    state.cam_intrinsic( 2 ) = g_cam_K( 0, 2 ) ;
-    state.cam_intrinsic( 3 ) = g_cam_K( 1, 2 ) ;
-    set_initial_state_cov( state );
+    state.camIntrinsic( 0 ) = g_cam_K( 0, 0 ) ;
+    state.camIntrinsic( 1 ) = g_cam_K( 1, 1 ) ;
+    state.camIntrinsic( 2 ) = g_cam_K( 0, 2 ) ;
+    state.camIntrinsic( 3 ) = g_cam_K( 1, 2 ) ;
+    setInitialStateCov( state );
     m_mutex_lio_process.unlock();
 }
 
-void IMUFusion::publish_track_img( cv::Mat &img, double frame_cost_time = -1 )
+void IMUFusion::publishTrackImg( cv::Mat &img, double frame_cost_time = -1 )
 {
     cv_bridge::CvImage out_msg;
     out_msg.header.stamp = ros::Time::now();               // Same timestamp and tf frame as input image
@@ -241,7 +223,7 @@ void IMUFusion::publish_track_img( cv::Mat &img, double frame_cost_time = -1 )
 //     pub_track_img.publish( out_msg );
 // }
 
-void IMUFusion::publish_raw_img( cv::Mat &img )
+void IMUFusion::publishRawImg( cv::Mat &img )
 {
     cv_bridge::CvImage out_msg;
     out_msg.header.stamp = ros::Time::now();               // Same timestamp and tf frame as input image
@@ -257,7 +239,7 @@ std::deque< sensor_msgs::CompressedImageConstPtr > g_received_compressed_img_msg
 std::deque< sensor_msgs::ImageConstPtr >           g_received_img_msg;
 std::shared_ptr< std::thread >                     g_thr_process_image;
 
-void IMUFusion::service_process_img_buffer()
+void IMUFusion::serviceProcessImgBuffer()
 {
     while ( 1 )
     {
@@ -312,11 +294,11 @@ void IMUFusion::service_process_img_buffer()
             g_received_img_msg.pop_front();
             mutex_image_callback.unlock();
         }
-        process_image( image_get, img_rec_time );
+        processImage( image_get, img_rec_time );
     }
 }
 
-void IMUFusion::image_comp_callback( const sensor_msgs::CompressedImageConstPtr &msg )
+void IMUFusion::imageCompressedCallback( const sensor_msgs::CompressedImageConstPtr &msg )
 {
     std::unique_lock< std::mutex > lock2( mutex_image_callback );
     if ( sub_image_typed == 1 )
@@ -328,13 +310,13 @@ void IMUFusion::image_comp_callback( const sensor_msgs::CompressedImageConstPtr 
     if ( g_flag_if_first_rec_img )
     {
         g_flag_if_first_rec_img = 0;
-        m_thread_pool_ptr->commit_task( &IMUFusion::service_process_img_buffer, this );
+        m_thread_pool_ptr->commit_task( &IMUFusion::serviceProcessImgBuffer, this );
     }
     return;
 }
 
 // ANCHOR - image_callback
-void IMUFusion::image_callback( const sensor_msgs::ImageConstPtr &msg )
+void IMUFusion::imageCallback( const sensor_msgs::ImageConstPtr &msg )
 {
     std::unique_lock< std::mutex > lock( mutex_image_callback );
     if ( sub_image_typed == 2 )
@@ -346,17 +328,17 @@ void IMUFusion::image_callback( const sensor_msgs::ImageConstPtr &msg )
     if ( g_flag_if_first_rec_img )
     {
         g_flag_if_first_rec_img = 0;
-        m_thread_pool_ptr->commit_task( &IMUFusion::service_process_img_buffer, this );
+        m_thread_pool_ptr->commit_task( &IMUFusion::serviceProcessImgBuffer, this );
     }
 
     cv::Mat temp_img = cv_bridge::toCvCopy( msg, sensor_msgs::image_encodings::BGR8 )->image.clone();
-    process_image( temp_img, msg->header.stamp.toSec() );
+    processImage( temp_img, msg->header.stamp.toSec() );
 }
 
 double last_accept_time = 0;
 int    buffer_max_frame = 0;
 int    total_frame_count = 0;
-void   IMUFusion::process_image( cv::Mat &temp_img, double msg_time )
+void   IMUFusion::processImage( cv::Mat &temp_img, double msg_time )
 {
     cv::Mat img_get;
     if ( temp_img.rows == 0 )
@@ -381,22 +363,22 @@ void   IMUFusion::process_image( cv::Mat &temp_img, double msg_time )
     if ( m_camera_start_ros_tim < 0 )
     {
         m_camera_start_ros_tim = msg_time;
-        m_vio_scale_factor = m_vio_image_width * m_image_downsample_ratio / temp_img.cols; // 320 * 24
+        m_vio_scale_factor = m_vioImageWidth * m_image_downsample_ratio / temp_img.cols; // 320 * 24
         // load_vio_parameters();
-        set_initial_camera_parameter( g_lio_state, m_camera_intrinsic.data(), m_camera_dist_coeffs.data(), m_camera_ext_R.data(),
+        setInitialCameraParameter( g_lio_state, m_camera_intrinsic.data(), m_camera_dist_coeffs.data(), m_camera_ext_R.data(),
                                       m_camera_ext_t.data(), m_vio_scale_factor );
         cv::eigen2cv( g_cam_K, intrinsic );
         cv::eigen2cv( g_cam_dist, dist_coeffs );
-        initUndistortRectifyMap( intrinsic, dist_coeffs, cv::Mat(), intrinsic, cv::Size( m_vio_image_width / m_vio_scale_factor, m_vio_image_heigh / m_vio_scale_factor ),
+        initUndistortRectifyMap( intrinsic, dist_coeffs, cv::Mat(), intrinsic, cv::Size( m_vioImageWidth / m_vio_scale_factor, m_vioImageHeight / m_vio_scale_factor ),
                                  CV_16SC2, m_ud_map1, m_ud_map2 );
-        m_thread_pool_ptr->commit_task( &IMUFusion::service_pub_rgb_maps, this);
-        m_thread_pool_ptr->commit_task( &IMUFusion::service_VIO_update, this);
+        m_thread_pool_ptr->commit_task( &IMUFusion::servicePubColorMaps, this);
+        m_thread_pool_ptr->commit_task( &IMUFusion::serviceVIOUpdate, this);
     }
     // std::cout << "temp image size cols: " << temp_img.cols << " rows :" << temp_img.rows << std::endl;
 
     if ( m_image_downsample_ratio != 1.0 )
     {
-        cv::resize( temp_img, img_get, cv::Size( m_vio_image_width / m_vio_scale_factor, m_vio_image_heigh / m_vio_scale_factor ) );
+        cv::resize( temp_img, img_get, cv::Size( m_vioImageWidth / m_vio_scale_factor, m_vioImageHeight / m_vio_scale_factor ) );
     }
     else
     {
@@ -425,18 +407,18 @@ void   IMUFusion::process_image( cv::Mat &temp_img, double msg_time )
     // cout << "Image queue size = " << m_queue_image_with_pose.size() << endl;
 }
 
-void IMUFusion::load_vio_parameters()
+void IMUFusion::loadVIOParameters()
 {
 
     std::vector< double > camera_intrinsic_data, camera_dist_coeffs_data, camera_ext_R_data, camera_ext_t_data;
-    m_ros_node_handle.getParam( "r3live_vio/image_width", m_vio_image_width );
-    m_ros_node_handle.getParam( "r3live_vio/image_height", m_vio_image_heigh );
+    m_ros_node_handle.getParam( "r3live_vio/image_width", m_vioImageWidth );
+    m_ros_node_handle.getParam( "r3live_vio/image_height", m_vioImageHeight );
     m_ros_node_handle.getParam( "r3live_vio/camera_intrinsic", camera_intrinsic_data );
     m_ros_node_handle.getParam( "r3live_vio/camera_dist_coeffs", camera_dist_coeffs_data );
     m_ros_node_handle.getParam( "r3live_vio/camera_ext_R", camera_ext_R_data );
     m_ros_node_handle.getParam( "r3live_vio/camera_ext_t", camera_ext_t_data );
 
-    CV_Assert( ( m_vio_image_width != 0 && m_vio_image_heigh != 0 ) );
+    CV_Assert( ( m_vioImageWidth != 0 && m_vioImageHeight != 0 ) );
 
     if ( ( camera_intrinsic_data.size() != 9 ) || ( camera_dist_coeffs_data.size() != 5 ) || ( camera_ext_R_data.size() != 9 ) ||
          ( camera_ext_t_data.size() != 3 ) )
@@ -451,19 +433,19 @@ void IMUFusion::load_vio_parameters()
 
     m_camera_intrinsic = Eigen::Map< Eigen::Matrix< double, 3, 3, Eigen::RowMajor > >( camera_intrinsic_data.data() );
     m_camera_dist_coeffs = Eigen::Map< Eigen::Matrix< double, 5, 1 > >( camera_dist_coeffs_data.data() );
-    // m_camera_ext_R = Eigen::Map< Eigen::Matrix< double, 3, 3, Eigen::RowMajor > >( camera_ext_R_data.data() );
-    // m_camera_ext_t = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( camera_ext_t_data.data() ); // pointcloud to camera
+    m_camera_ext_R = Eigen::Map< Eigen::Matrix< double, 3, 3, Eigen::RowMajor > >( camera_ext_R_data.data() );
+    m_camera_ext_t = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( camera_ext_t_data.data() ); // pointcloud to camera
     auto R_point2cam = Eigen::Map< Eigen::Matrix< double, 3, 3, Eigen::RowMajor > >( camera_ext_R_data.data() );
     auto t_point2cam = Eigen::Map< Eigen::Matrix< double, 3, 1 > >( camera_ext_t_data.data() ); // pointcloud to camera
     //static const Eigen::Vector3d Lidar_offset_to_IMU(-38.86, 4.6, 33.46); // POP3
 
-    // m_camera_ext_t = -R_point2cam * Lidar_offset_to_IMU +  t_point2cam;
-    // m_camera_ext_R = m_camera_ext_R.inverse().eval();
-    // m_camera_ext_t = - m_camera_ext_R * m_camera_ext_t; // camera to imu
+    m_camera_ext_t = -R_point2cam * Lidar_offset_to_IMU +  t_point2cam;
+    m_camera_ext_R = m_camera_ext_R.inverse().eval();
+    m_camera_ext_t = - m_camera_ext_R * m_camera_ext_t; // camera to imu
 
-    m_camera_ext_R << 0.98749966, 0.07059958, -0.07675654, 0.99629712,
-        0.03873596, -0.13766935, -0.04906874, 0.98926205;
-    m_camera_ext_t << -29.22365, 10.77156, 38.70245;
+    // m_camera_ext_R << 0.98749966, 0.07059958, -0.07675654, 0.99629712,
+    //     0.03873596, -0.13766935, -0.04906874, 0.98926205;
+    // m_camera_ext_t << -29.22365, 10.77156, 38.70245;
     // m_camera_ext_t = -R_point2cam * Lidar_offset_to_IMU +  t_point2cam;
 
     // m_camera_ext_R << 0.99369908, 0.07287842, 0.08515205, 
@@ -479,7 +461,7 @@ void IMUFusion::load_vio_parameters()
     std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 }
 
-void IMUFusion::set_image_pose( std::shared_ptr< ImageFrame > &image_pose, const StatesGroup &state )
+void IMUFusion::setImagePose( std::shared_ptr< ImageFrame > &image_pose, const StatesGroup &state )
 {
     mat_3_3 rot_mat = state.rot_end;
     vec_3   t_vec = state.pos_end;
@@ -494,10 +476,10 @@ void IMUFusion::set_image_pose( std::shared_ptr< ImageFrame > &image_pose, const
 
     image_pose->set_pose( eigen_q( R_w2c ), t_w2c );
 
-    image_pose->fx = state.cam_intrinsic( 0 );
-    image_pose->fy = state.cam_intrinsic( 1 );
-    image_pose->cx = state.cam_intrinsic( 2 );
-    image_pose->cy = state.cam_intrinsic( 3 );
+    image_pose->fx = state.camIntrinsic( 0 );
+    image_pose->fy = state.camIntrinsic( 1 );
+    image_pose->cx = state.camIntrinsic( 2 );
+    image_pose->cy = state.camIntrinsic( 3 );
 
     image_pose->m_cam_K << image_pose->fx, 0, image_pose->cx, 0, image_pose->fy, image_pose->cy, 0, 0, 1;
     scope_color( ANSI_COLOR_CYAN_BOLD );
@@ -507,7 +489,7 @@ void IMUFusion::set_image_pose( std::shared_ptr< ImageFrame > &image_pose, const
     // image_pose->inverse_pose();
 }
 
-void IMUFusion::publish_camera_odom( std::shared_ptr< ImageFrame > &image, double msg_time )
+void IMUFusion::publishCameraOdom( std::shared_ptr< ImageFrame > &image, double msg_time )
 {
     eigen_q            odom_q = image->m_pose_w2c_q;
     vec_3              odom_t = image->m_pose_w2c_t;
@@ -539,7 +521,7 @@ void IMUFusion::publish_camera_odom( std::shared_ptr< ImageFrame > &image, doubl
     pub_path_cam.publish( camera_path );
 }
 
-void IMUFusion::publish_track_pts(ColorMapTracker &tracker) {
+void IMUFusion::publishTrackPoints(ColorMapTracker &tracker) {
   pcl::PointXYZRGB temp_point;
   pcl::PointCloud<pcl::PointXYZRGB> pointcloud_for_pub;
 
@@ -561,33 +543,32 @@ void IMUFusion::publish_track_pts(ColorMapTracker &tracker) {
   m_pub_visual_tracked_3d_pts.publish(ros_pc_msg);
 }
 
-// ANCHOR - VIO preintegration
-bool IMUFusion::vio_preintegration( StatesGroup &state_in, StatesGroup &state_out, double current_frame_time )
+bool IMUFusion::vioPreintegration( StatesGroup &stateIn, StatesGroup &stateOut, double curFrameTimestamp )
 {
-    state_out = state_in;
-    if ( current_frame_time <= state_in.last_update_time )
+    stateOut = stateIn;
+    if ( curFrameTimestamp <= stateIn.lastUpdateTime )
     {
         // cout << ANSI_COLOR_RED_BOLD << "Error current_frame_time <= state_in.last_update_time | " <<
         // current_frame_time - state_in.last_update_time << ANSI_COLOR_RESET << endl;
         return false;
     }
-    mtx_buffer.lock();
-    std::deque< sensor_msgs::Imu::ConstPtr > vio_imu_queue;
-    for ( auto it = imu_buffer_vio.begin(); it != imu_buffer_vio.end(); it++ )
+    mtxBuffer.lock();
+    std::deque< sensor_msgs::Imu::ConstPtr > vioImuQueue;
+    for (auto & it : imuBufferVio)
     {
-        vio_imu_queue.push_back( *it );
-        if ( ( *it )->header.stamp.toSec() > current_frame_time )
+        vioImuQueue.push_back( it );
+        if ( it->header.stamp.toSec() > curFrameTimestamp )
         {
             break;
         }
     }
 
-    while ( !imu_buffer_vio.empty() )
+    while ( !imuBufferVio.empty() )
     {
-        double imu_time = imu_buffer_vio.front()->header.stamp.toSec();
-        if ( imu_time < current_frame_time - 0.2 )
+        double imuTimestamp = imuBufferVio.front()->header.stamp.toSec();
+        if ( imuTimestamp < curFrameTimestamp - 0.2 )
         {
-            imu_buffer_vio.pop_front();
+            imuBufferVio.pop_front();
         }
         else
         {
@@ -595,17 +576,17 @@ bool IMUFusion::vio_preintegration( StatesGroup &state_in, StatesGroup &state_ou
         }
     }
     // cout << "Current VIO_imu buffer size = " << imu_buffer_vio.size() << endl;
-    state_out = m_imu_process->IMUPreintegration( state_out, vio_imu_queue, current_frame_time - vio_imu_queue.back()->header.stamp.toSec() );
-    eigen_q q_diff( state_out.rot_end.transpose() * state_in.rot_end );
-    cout << "Pos diff = " << (state_out.pos_end - state_in.pos_end).transpose() << endl;
+    stateOut = m_imu_process->imuPreintegration( stateOut, vioImuQueue, curFrameTimestamp - vioImuQueue.back()->header.stamp.toSec() );
+    eigen_q q_diff( stateOut.rot_end.transpose() * stateIn.rot_end );
+    cout << "Pos diff = " << (stateOut.pos_end - stateIn.pos_end).transpose() << endl;
     cout << "Euler diff = " << q_diff.angularDistance(eigen_q::Identity()) * 57.3 << endl;
-    mtx_buffer.unlock();
-    state_out.last_update_time = current_frame_time;
+    mtxBuffer.unlock();
+    stateOut.lastUpdateTime = curFrameTimestamp;
     return true;
 }
 
 // ANCHOR - huber_loss
-double get_huber_loss_scale( double reprojection_error, double outlier_threshold = 2.0 )
+double getHuberLossScale( double reprojection_error, double outlier_threshold = 2.0 )
 {
     // http://ceres-solver.org/nnls_modeling.html#lossfunction
     double scale = 1.0;
@@ -622,185 +603,194 @@ double get_huber_loss_scale( double reprojection_error, double outlier_threshold
 
 // ANCHOR - VIO_esikf
 const int minimum_iteration_pts = 10;
-bool      IMUFusion::vio_esikf( StatesGroup &state_in, ColorMapTracker &op_track )
-{
-    Common_tools::Timer tim;
-    tim.tic();
-    scope_color( ANSI_COLOR_BLUE_BOLD );
-    StatesGroup state_iter = state_in;
-    if ( !m_if_estimate_intrinsic ) // When disable the online intrinsic calibration.
-    {
-        state_iter.cam_intrinsic << g_cam_K( 0, 0 ), g_cam_K( 1, 1 ), g_cam_K( 0, 2 ), g_cam_K( 1, 2 );
+bool IMUFusion::vioEsikf(StatesGroup &stateIn, ColorMapTracker &opticalTrack) {
+  Common_tools::Timer tim;
+  tim.tic();
+  scope_color(ANSI_COLOR_BLUE_BOLD);
+  StatesGroup stateIter = stateIn;
+  if (!m_ifEstimateIntrinsic) // When disable the online intrinsic calibration.
+  {
+    stateIter.camIntrinsic << g_cam_K(0, 0), g_cam_K(1, 1), g_cam_K(0, 2),
+        g_cam_K(1, 2);
+  }
+
+  if (!m_ifEstimateI2CExtrinsic) {
+    stateIter.pos_ext_c2i = m_inital_pos_ext_c2i;
+    stateIter.rot_ext_c2i = m_inital_rot_ext_c2i;
+  }
+
+  Eigen::Matrix<double, -1, -1> H_mat;
+  Eigen::Matrix<double, -1, 1> measVec;
+  Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> G, H_T_H, I_STATE;
+  Eigen::Matrix<double, DIM_OF_STATES, 1> solution;
+  Eigen::Matrix<double, -1, -1> K, KH;
+  Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> K_1;
+
+  Eigen::SparseMatrix<double> H_mat_spa, H_T_H_spa, K_spa, KH_spa, vec_spa,
+      I_STATE_spa;
+  I_STATE.setIdentity();
+  I_STATE_spa = I_STATE.sparseView();
+  double fx, fy, cx, cy, time_td;
+
+  int total_pt_size = opticalTrack.m_map_rgb_pts_in_current_frame_pos.size();
+  std::vector<double> last_reprojection_error_vec(total_pt_size),
+      current_reprojection_error_vec(total_pt_size);
+
+  if (total_pt_size < minimum_iteration_pts) {
+    stateIn = stateIter;
+    return false;
+  }
+  H_mat.resize(total_pt_size * 2, DIM_OF_STATES);
+  measVec.resize(total_pt_size * 2, 1);
+  double last_repro_err = 3e8;
+  int avail_pt_count = 0;
+  double last_avr_repro_err = 0;
+
+  double acc_reprojection_error = 0;
+  double img_res_scale = 1.0;
+  std::cout
+      << "vio_esikf!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: "
+      << std::endl;
+  for (int iter_count = 0; iter_count < esikf_iter_times; iter_count++) {
+    cout << "========== Iter " << iter_count << " =========" << endl;
+    mat_3_3 R_imu = stateIter.rot_end;
+    vec_3 t_imu = stateIter.pos_end;
+    vec_3 t_c2w = R_imu * stateIter.pos_ext_c2i + t_imu;
+    mat_3_3 R_c2w = R_imu * stateIter.rot_ext_c2i; // world to camera frame
+
+    fx = stateIter.camIntrinsic(0);
+    fy = stateIter.camIntrinsic(1);
+    cx = stateIter.camIntrinsic(2);
+    cy = stateIter.camIntrinsic(3);
+    time_td = stateIter.td_ext_c2i_delta;
+
+    vec_3 t_w2c = -R_c2w.transpose() * t_c2w;
+    mat_3_3 R_w2c = R_c2w.transpose();
+    int pt_idx = -1;
+    acc_reprojection_error = 0;
+    vec_3 pt_3d_w, pt_3d_cam;
+    vec_2 pt_img_measure, pt_img_proj, pt_img_vel;
+    eigen_mat_d<2, 3> mat_pre;
+    eigen_mat_d<3, 3> mat_A, mat_B, mat_C, mat_D, pt_hat;
+    H_mat.setZero();
+    solution.setZero();
+    measVec.setZero();
+    avail_pt_count = 0;
+    for (auto it = opticalTrack.m_map_rgb_pts_in_last_frame_pos.begin();
+         it != opticalTrack.m_map_rgb_pts_in_last_frame_pos.end(); it++) {
+      pt_3d_w = ((RGBPoints *)it->first)->get_pos();
+      pt_img_vel = ((RGBPoints *)it->first)->m_img_vel;
+      pt_img_measure = vec_2(it->second.x, it->second.y);
+      pt_3d_cam = R_w2c * pt_3d_w + t_w2c;
+      pt_img_proj = vec_2(fx * pt_3d_cam(0) / pt_3d_cam(2) + cx,
+                          fy * pt_3d_cam(1) / pt_3d_cam(2) + cy) +
+                    time_td * pt_img_vel;
+      double repro_err = (pt_img_proj - pt_img_measure).norm();
+      double huber_loss_scale = getHuberLossScale(repro_err);
+      pt_idx++;
+      acc_reprojection_error += repro_err;
+      // if (iter_count == 0 || ((repro_err -
+      // last_reprojection_error_vec[pt_idx]) < 1.5))
+      if (iter_count == 0 || ((repro_err - last_avr_repro_err * 5.0) < 0)) {
+        last_reprojection_error_vec[pt_idx] = repro_err;
+      } else {
+        last_reprojection_error_vec[pt_idx] = repro_err;
+      }
+      avail_pt_count++;
+      // Appendix E of r2live_Supplementary_material.
+      // https://github.com/hku-mars/r2live/blob/master/supply/r2live_Supplementary_material.pdf
+      mat_pre << fx / pt_3d_cam(2), 0, -fx * pt_3d_cam(0) / pt_3d_cam(2), 0,
+          fy / pt_3d_cam(2), -fy * pt_3d_cam(1) / pt_3d_cam(2);
+
+      pt_hat = Sophus::SO3d::hat(
+          (R_imu.transpose() * (pt_3d_w - t_imu))); // convert pt -> imu body
+      mat_A = stateIter.rot_ext_c2i.transpose() * pt_hat;
+      mat_B = -stateIter.rot_ext_c2i.transpose() * (R_imu.transpose());
+      mat_C = Sophus::SO3d::hat(pt_3d_cam);
+      mat_D = -stateIter.rot_ext_c2i.transpose();
+      measVec.block(pt_idx * 2, 0, 2, 1) =
+          (pt_img_proj - pt_img_measure) * huber_loss_scale / img_res_scale;
+
+      H_mat.block(pt_idx * 2, 0, 2, 3) = mat_pre * mat_A * huber_loss_scale;
+      H_mat.block(pt_idx * 2, 3, 2, 3) = mat_pre * mat_B * huber_loss_scale;
+      if (DIM_OF_STATES > 24) {
+        // Estimate time td.
+        H_mat.block(pt_idx * 2, 24, 2, 1) = pt_img_vel * huber_loss_scale;
+        // H_mat(pt_idx * 2, 24) = pt_img_vel(0) * huber_loss_scale;
+        // H_mat(pt_idx * 2 + 1, 24) = pt_img_vel(1) * huber_loss_scale;
+      }
+      if (m_ifEstimateI2CExtrinsic) {
+        H_mat.block(pt_idx * 2, 18, 2, 3) = mat_pre * mat_C * huber_loss_scale;
+        H_mat.block(pt_idx * 2, 21, 2, 3) = mat_pre * mat_D * huber_loss_scale;
+      }
+
+      if (m_ifEstimateIntrinsic) {
+        H_mat(pt_idx * 2, 25) = pt_3d_cam(0) / pt_3d_cam(2) * huber_loss_scale;
+        H_mat(pt_idx * 2 + 1, 26) =
+            pt_3d_cam(1) / pt_3d_cam(2) * huber_loss_scale;
+        H_mat(pt_idx * 2, 27) = 1 * huber_loss_scale;
+        H_mat(pt_idx * 2 + 1, 28) = 1 * huber_loss_scale;
+      }
+    }
+    H_mat = H_mat / img_res_scale;
+    acc_reprojection_error /= total_pt_size;
+    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: "
+              << std::endl;
+    std::cout << "project error: " << acc_reprojection_error << std::endl;
+    std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: "
+              << std::endl;
+
+    last_avr_repro_err = acc_reprojection_error;
+    if (avail_pt_count < minimum_iteration_pts) {
+      break;
     }
 
-    if ( !m_if_estimate_i2c_extrinsic )
-    {
-        state_iter.pos_ext_c2i = m_inital_pos_ext_c2i;
-        state_iter.rot_ext_c2i = m_inital_rot_ext_c2i;
+    H_mat_spa = H_mat.sparseView();
+    Eigen::SparseMatrix<double> Hsub_T_temp_mat = H_mat_spa.transpose();
+    vec_spa = (stateIter - stateIn).sparseView();
+    H_T_H_spa = Hsub_T_temp_mat * H_mat_spa;
+    // Notice that we have combine some matrix using () in order to boost the
+    // matrix multiplication.
+    Eigen::SparseMatrix<double> temp_inv_mat =
+        ((H_T_H_spa.toDense() +
+          eigen_mat<-1, -1>(stateIn.cov * m_cam_measurement_weight).inverse())
+             .inverse())
+            .sparseView();
+    KH_spa = temp_inv_mat * (Hsub_T_temp_mat * H_mat_spa);
+    solution =
+        (temp_inv_mat * (Hsub_T_temp_mat * ((-1 * measVec.sparseView()))) -
+         (I_STATE_spa - KH_spa) * vec_spa)
+            .toDense();
+
+    stateIter = stateIter + solution;
+
+    if (fabs(acc_reprojection_error - last_repro_err) < 0.01) {
+      break;
     }
+    last_repro_err = acc_reprojection_error;
+  }
 
-    Eigen::Matrix< double, -1, -1 >                       H_mat;
-    Eigen::Matrix< double, -1, 1 >                        meas_vec;
-    Eigen::Matrix< double, DIM_OF_STATES, DIM_OF_STATES > G, H_T_H, I_STATE;
-    Eigen::Matrix< double, DIM_OF_STATES, 1 >             solution;
-    Eigen::Matrix< double, -1, -1 >                       K, KH;
-    Eigen::Matrix< double, DIM_OF_STATES, DIM_OF_STATES > K_1;
+  if (avail_pt_count >= minimum_iteration_pts) {
+    stateIter.cov =
+        ((I_STATE_spa - KH_spa) * stateIter.cov.sparseView()).toDense();
+  }
 
-    Eigen::SparseMatrix< double > H_mat_spa, H_T_H_spa, K_spa, KH_spa, vec_spa, I_STATE_spa;
-    I_STATE.setIdentity();
-    I_STATE_spa = I_STATE.sparseView();
-    double fx, fy, cx, cy, time_td;
-
-    int                   total_pt_size = op_track.m_map_rgb_pts_in_current_frame_pos.size();
-    std::vector< double > last_reprojection_error_vec( total_pt_size ), current_reprojection_error_vec( total_pt_size );
-
-    if ( total_pt_size < minimum_iteration_pts )
-    {
-        state_in = state_iter;
-        return false;
-    }
-    H_mat.resize( total_pt_size * 2, DIM_OF_STATES );
-    meas_vec.resize( total_pt_size * 2, 1 );
-    double last_repro_err = 3e8;
-    int    avail_pt_count = 0;
-    double last_avr_repro_err = 0;
-
-    double acc_reprojection_error = 0;
-    double img_res_scale = 1.0;
-    std::cout << "vio_esikf!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << std::endl;
-    for ( int iter_count = 0; iter_count < esikf_iter_times; iter_count++ )
-    {
-        cout << "========== Iter " << iter_count << " =========" << endl;
-        mat_3_3 R_imu = state_iter.rot_end;
-        vec_3   t_imu = state_iter.pos_end;
-        vec_3   t_c2w = R_imu * state_iter.pos_ext_c2i + t_imu;
-        mat_3_3 R_c2w = R_imu * state_iter.rot_ext_c2i; // world to camera frame
-
-        fx = state_iter.cam_intrinsic( 0 );
-        fy = state_iter.cam_intrinsic( 1 );
-        cx = state_iter.cam_intrinsic( 2 );
-        cy = state_iter.cam_intrinsic( 3 );
-        time_td = state_iter.td_ext_c2i_delta;
-
-        vec_3   t_w2c = -R_c2w.transpose() * t_c2w;
-        mat_3_3 R_w2c = R_c2w.transpose();
-        int     pt_idx = -1;
-        acc_reprojection_error = 0;
-        vec_3               pt_3d_w, pt_3d_cam;
-        vec_2               pt_img_measure, pt_img_proj, pt_img_vel;
-        eigen_mat_d< 2, 3 > mat_pre;
-        eigen_mat_d< 3, 3 > mat_A, mat_B, mat_C, mat_D, pt_hat;
-        H_mat.setZero();
-        solution.setZero();
-        meas_vec.setZero();
-        avail_pt_count = 0;
-        for ( auto it = op_track.m_map_rgb_pts_in_last_frame_pos.begin(); it != op_track.m_map_rgb_pts_in_last_frame_pos.end(); it++ )
-        {
-            pt_3d_w = ( ( RGBPoints * ) it->first )->get_pos();
-            pt_img_vel = ( ( RGBPoints * ) it->first )->m_img_vel;
-            pt_img_measure = vec_2( it->second.x, it->second.y );
-            pt_3d_cam = R_w2c * pt_3d_w + t_w2c;
-            pt_img_proj = vec_2( fx * pt_3d_cam( 0 ) / pt_3d_cam( 2 ) + cx, fy * pt_3d_cam( 1 ) / pt_3d_cam( 2 ) + cy ) + time_td * pt_img_vel;
-            double repro_err = ( pt_img_proj - pt_img_measure ).norm();
-            double huber_loss_scale = get_huber_loss_scale( repro_err );
-            pt_idx++;
-            acc_reprojection_error += repro_err;
-            // if (iter_count == 0 || ((repro_err - last_reprojection_error_vec[pt_idx]) < 1.5))
-            if ( iter_count == 0 || ( ( repro_err - last_avr_repro_err * 5.0 ) < 0 ) )
-            {
-                last_reprojection_error_vec[ pt_idx ] = repro_err;
-            }
-            else
-            {
-                last_reprojection_error_vec[ pt_idx ] = repro_err;
-            }
-            avail_pt_count++;
-            // Appendix E of r2live_Supplementary_material.
-            // https://github.com/hku-mars/r2live/blob/master/supply/r2live_Supplementary_material.pdf
-            mat_pre << fx / pt_3d_cam( 2 ), 0, -fx * pt_3d_cam( 0 ) / pt_3d_cam( 2 ), 0, fy / pt_3d_cam( 2 ), -fy * pt_3d_cam( 1 ) / pt_3d_cam( 2 );
-
-            pt_hat = Sophus::SO3d::hat( ( R_imu.transpose() * ( pt_3d_w - t_imu ) ) ); // convert pt -> imu body 
-            mat_A = state_iter.rot_ext_c2i.transpose() * pt_hat;
-            mat_B = -state_iter.rot_ext_c2i.transpose() * ( R_imu.transpose() );
-            mat_C = Sophus::SO3d::hat( pt_3d_cam );
-            mat_D = -state_iter.rot_ext_c2i.transpose();
-            meas_vec.block( pt_idx * 2, 0, 2, 1 ) = ( pt_img_proj - pt_img_measure ) * huber_loss_scale / img_res_scale;
-
-            H_mat.block( pt_idx * 2, 0, 2, 3 ) = mat_pre * mat_A * huber_loss_scale;
-            H_mat.block( pt_idx * 2, 3, 2, 3 ) = mat_pre * mat_B * huber_loss_scale;
-            if ( DIM_OF_STATES > 24 )
-            {
-                // Estimate time td.
-                H_mat.block( pt_idx * 2, 24, 2, 1 ) = pt_img_vel * huber_loss_scale;
-                // H_mat(pt_idx * 2, 24) = pt_img_vel(0) * huber_loss_scale;
-                // H_mat(pt_idx * 2 + 1, 24) = pt_img_vel(1) * huber_loss_scale;
-            }
-            if ( m_if_estimate_i2c_extrinsic )
-            {
-                H_mat.block( pt_idx * 2, 18, 2, 3 ) = mat_pre * mat_C * huber_loss_scale;
-                H_mat.block( pt_idx * 2, 21, 2, 3 ) = mat_pre * mat_D * huber_loss_scale;
-            }
-
-            if ( m_if_estimate_intrinsic )
-            {
-                H_mat( pt_idx * 2, 25 ) = pt_3d_cam( 0 ) / pt_3d_cam( 2 ) * huber_loss_scale;
-                H_mat( pt_idx * 2 + 1, 26 ) = pt_3d_cam( 1 ) / pt_3d_cam( 2 ) * huber_loss_scale;
-                H_mat( pt_idx * 2, 27 ) = 1 * huber_loss_scale;
-                H_mat( pt_idx * 2 + 1, 28 ) = 1 * huber_loss_scale;
-            }
-        }
-        H_mat = H_mat / img_res_scale;
-        acc_reprojection_error /= total_pt_size;
-        std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << std::endl;
-        std::cout << "project error: " << acc_reprojection_error << std::endl;
-        std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!: " << std::endl;
-
-        last_avr_repro_err = acc_reprojection_error;
-        if ( avail_pt_count < minimum_iteration_pts )
-        {
-            break;
-        }
-
-        H_mat_spa = H_mat.sparseView();
-        Eigen::SparseMatrix< double > Hsub_T_temp_mat = H_mat_spa.transpose();
-        vec_spa = ( state_iter - state_in ).sparseView();
-        H_T_H_spa = Hsub_T_temp_mat * H_mat_spa;
-        // Notice that we have combine some matrix using () in order to boost the matrix multiplication.
-        Eigen::SparseMatrix< double > temp_inv_mat =
-            ( ( H_T_H_spa.toDense() + eigen_mat< -1, -1 >( state_in.cov * m_cam_measurement_weight ).inverse() ).inverse() ).sparseView();
-        KH_spa = temp_inv_mat * ( Hsub_T_temp_mat * H_mat_spa );
-        solution = ( temp_inv_mat * ( Hsub_T_temp_mat * ( ( -1 * meas_vec.sparseView() ) ) ) - ( I_STATE_spa - KH_spa ) * vec_spa ).toDense();
-
-        state_iter = state_iter + solution;
-
-        if ( fabs( acc_reprojection_error - last_repro_err ) < 0.01 )
-        {
-            break;
-        }
-        last_repro_err = acc_reprojection_error;
-    }
-
-    if ( avail_pt_count >= minimum_iteration_pts )
-    {
-        state_iter.cov = ( ( I_STATE_spa - KH_spa ) * state_iter.cov.sparseView() ).toDense();
-    }
-
-    state_iter.td_ext_c2i += state_iter.td_ext_c2i_delta;
-    state_iter.td_ext_c2i_delta = 0;
-    state_in = state_iter;
-    return true;
+  stateIter.td_ext_c2i += stateIter.td_ext_c2i_delta;
+  stateIter.td_ext_c2i_delta = 0;
+  stateIn = stateIter;
+  return true;
 }
 
-bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_track, std::shared_ptr< ImageFrame > &image )
+bool IMUFusion::vioPhotometric( StatesGroup &stateIn, ColorMapTracker &opticalTrack, std::shared_ptr< ImageFrame > &image )
 {
     Common_tools::Timer tim;
     tim.tic();
-    StatesGroup state_iter = state_in;
-    if ( !m_if_estimate_intrinsic )     // When disable the online intrinsic calibration.
+    StatesGroup state_iter = stateIn;
+    if ( !m_ifEstimateIntrinsic )     // When disable the online intrinsic calibration.
     {
-        state_iter.cam_intrinsic << g_cam_K( 0, 0 ), g_cam_K( 1, 1 ), g_cam_K( 0, 2 ), g_cam_K( 1, 2 );
+        state_iter.camIntrinsic << g_cam_K( 0, 0 ), g_cam_K( 1, 1 ), g_cam_K( 0, 2 ), g_cam_K( 1, 2 );
     }
-    if ( !m_if_estimate_i2c_extrinsic ) // When disable the online extrinsic calibration.
+    if ( !m_ifEstimateI2CExtrinsic ) // When disable the online extrinsic calibration.
     {
         state_iter.pos_ext_c2i = m_inital_pos_ext_c2i;
         state_iter.rot_ext_c2i = m_inital_rot_ext_c2i;
@@ -816,11 +806,11 @@ bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_trac
     I_STATE_spa = I_STATE.sparseView();
     double fx, fy, cx, cy, time_td;
 
-    int                   total_pt_size = op_track.m_map_rgb_pts_in_current_frame_pos.size();
+    int                   total_pt_size = opticalTrack.m_map_rgb_pts_in_current_frame_pos.size();
     std::vector< double > last_reprojection_error_vec( total_pt_size ), current_reprojection_error_vec( total_pt_size );
     if ( total_pt_size < minimum_iteration_pts )
     {
-        state_in = state_iter;
+        stateIn = state_iter;
         return false;
     }
 
@@ -845,10 +835,10 @@ bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_trac
         vec_3   t_c2w = R_imu * state_iter.pos_ext_c2i + t_imu;
         mat_3_3 R_c2w = R_imu * state_iter.rot_ext_c2i; // world to camera frame
 
-        fx = state_iter.cam_intrinsic( 0 );
-        fy = state_iter.cam_intrinsic( 1 );
-        cx = state_iter.cam_intrinsic( 2 );
-        cy = state_iter.cam_intrinsic( 3 );
+        fx = state_iter.camIntrinsic( 0 );
+        fy = state_iter.camIntrinsic( 1 );
+        cx = state_iter.camIntrinsic( 2 );
+        cy = state_iter.camIntrinsic( 3 );
         time_td = state_iter.td_ext_c2i_delta;
 
         vec_3   t_w2c = -R_c2w.transpose() * t_c2w;
@@ -868,7 +858,7 @@ bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_trac
         avail_pt_count = 0;
         int iter_layer = 0;
         tim.tic( "Build_cost" );
-        for ( auto it = op_track.m_map_rgb_pts_in_last_frame_pos.begin(); it != op_track.m_map_rgb_pts_in_last_frame_pos.end(); it++ )
+        for ( auto it = opticalTrack.m_map_rgb_pts_in_last_frame_pos.begin(); it != opticalTrack.m_map_rgb_pts_in_last_frame_pos.end(); it++ )
         {
             if ( ( ( RGBPoints * ) it->first )->m_N_rgb < 3 )
             {
@@ -893,7 +883,7 @@ bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_trac
             vec_3  obs_rgb_dx, obs_rgb_dy;
             vec_3  obs_rgb = image->get_rgb( pt_img_proj( 0 ), pt_img_proj( 1 ), 0, &obs_rgb_dx, &obs_rgb_dy );
             vec_3  photometric_err_vec = ( obs_rgb - pt_rgb );
-            double huber_loss_scale = get_huber_loss_scale( photometric_err_vec.norm() );
+            double huber_loss_scale = getHuberLossScale( photometric_err_vec.norm() );
             photometric_err_vec *= huber_loss_scale;
             double photometric_err = photometric_err_vec.transpose() * pt_rgb_info * photometric_err_vec;
 
@@ -920,7 +910,7 @@ bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_trac
             H_mat.block( pt_idx * 3, 3, 3, 3 ) = mat_d_pho_d_img * mat_B * huber_loss_scale;
             if ( 1 )
             {
-                if ( m_if_estimate_i2c_extrinsic )
+                if ( m_ifEstimateI2CExtrinsic )
                 {
                     H_mat.block( pt_idx * 3, 18, 3, 3 ) = mat_d_pho_d_img * mat_C * huber_loss_scale;
                     H_mat.block( pt_idx * 3, 21, 3, 3 ) = mat_d_pho_d_img * mat_D * huber_loss_scale;
@@ -940,10 +930,10 @@ bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_trac
         {
             H_mat_spa = H_mat.sparseView();
             Eigen::SparseMatrix< double > Hsub_T_temp_mat = H_mat_spa.transpose();
-            vec_spa = ( state_iter - state_in ).sparseView();
+            vec_spa = ( state_iter - stateIn ).sparseView();
             H_T_H_spa = Hsub_T_temp_mat * R_mat_inv_spa * H_mat_spa;
             Eigen::SparseMatrix< double > temp_inv_mat =
-                ( H_T_H_spa.toDense() + ( state_in.cov * m_cam_measurement_weight ).inverse() ).inverse().sparseView();
+                ( H_T_H_spa.toDense() + ( stateIn.cov * m_cam_measurement_weight ).inverse() ).inverse().sparseView();
             // ( H_T_H_spa.toDense() + ( state_in.cov ).inverse() ).inverse().sparseView();
             Eigen::SparseMatrix< double > Ht_R_inv = ( Hsub_T_temp_mat * R_mat_inv_spa );
             KH_spa = temp_inv_mat * Ht_R_inv * H_mat_spa;
@@ -971,16 +961,16 @@ bool IMUFusion::vio_photometric( StatesGroup &state_in, ColorMapTracker &op_trac
     }
     state_iter.td_ext_c2i += state_iter.td_ext_c2i_delta;
     state_iter.td_ext_c2i_delta = 0;
-    state_in = state_iter;
+    stateIn = state_iter;
     return true;
 }
 
-void IMUFusion::service_pub_rgb_maps()
+void IMUFusion::servicePubColorMaps()
 {
     int last_publish_map_idx = -3e8;
     int sleep_time_aft_pub = 10;
-    int number_of_pts_per_topic = 1000;
-    if ( number_of_pts_per_topic < 0 )
+    int numberPointsPerTopic = 1000;
+    if ( numberPointsPerTopic < 0 )
     {
         return;
     }
@@ -988,55 +978,55 @@ void IMUFusion::service_pub_rgb_maps()
     {
         ros::spinOnce();
         std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
-        pcl::PointCloud< pcl::PointXYZRGB > pc_rgb;
-        sensor_msgs::PointCloud2            ros_pc_msg;
-        int pts_size = m_map_rgb_pts.m_rgb_pts_vec.size();
-        pc_rgb.resize( number_of_pts_per_topic );
+        pcl::PointCloud< pcl::PointXYZRGB > colorPointcloud;
+        sensor_msgs::PointCloud2            rosPointcloudMsg;
+        int pts_size = m_mapColorPoints.m_ColorPointsVec.size();
+        colorPointcloud.resize( numberPointsPerTopic );
         // for (int i = pts_size - 1; i > 0; i--)
-        int pub_idx_size = 0;
+        int publishId = 0;
         int cur_topic_idx = 0;
-        if ( last_publish_map_idx == m_map_rgb_pts.m_last_updated_frame_idx )
+        if ( last_publish_map_idx == m_mapColorPoints.m_last_updated_frame_idx )
         {
             continue;
         }
-        last_publish_map_idx = m_map_rgb_pts.m_last_updated_frame_idx;
+        last_publish_map_idx = m_mapColorPoints.m_last_updated_frame_idx;
         for ( int i = 0; i < pts_size; i++ )
         {
-            if ( m_map_rgb_pts.m_rgb_pts_vec[ i ]->m_N_rgb < 1 )
+            if ( m_mapColorPoints.m_ColorPointsVec[ i ]->m_N_rgb < 1 )
             {
                 continue;
             }
-            pc_rgb.points[ pub_idx_size ].x = m_map_rgb_pts.m_rgb_pts_vec[ i ]->m_pos[ 0 ];
-            pc_rgb.points[ pub_idx_size ].y = m_map_rgb_pts.m_rgb_pts_vec[ i ]->m_pos[ 1 ];
-            pc_rgb.points[ pub_idx_size ].z = m_map_rgb_pts.m_rgb_pts_vec[ i ]->m_pos[ 2 ];
-            pc_rgb.points[ pub_idx_size ].r = m_map_rgb_pts.m_rgb_pts_vec[ i ]->m_rgb[ 2 ];
-            pc_rgb.points[ pub_idx_size ].g = m_map_rgb_pts.m_rgb_pts_vec[ i ]->m_rgb[ 1 ];
-            pc_rgb.points[ pub_idx_size ].b = m_map_rgb_pts.m_rgb_pts_vec[ i ]->m_rgb[ 0 ];
+            colorPointcloud.points[ publishId ].x = m_mapColorPoints.m_ColorPointsVec[ i ]->m_pos[ 0 ];
+            colorPointcloud.points[ publishId ].y = m_mapColorPoints.m_ColorPointsVec[ i ]->m_pos[ 1 ];
+            colorPointcloud.points[ publishId ].z = m_mapColorPoints.m_ColorPointsVec[ i ]->m_pos[ 2 ];
+            colorPointcloud.points[ publishId ].r = m_mapColorPoints.m_ColorPointsVec[ i ]->m_rgb[ 2 ];
+            colorPointcloud.points[ publishId ].g = m_mapColorPoints.m_ColorPointsVec[ i ]->m_rgb[ 1 ];
+            colorPointcloud.points[ publishId ].b = m_mapColorPoints.m_ColorPointsVec[ i ]->m_rgb[ 0 ];
             // pc_rgb.points[i].intensity = m_map_rgb_pts.m_rgb_pts_vec[i]->m_obs_dis;
-            pub_idx_size++;
-            if ( pub_idx_size == number_of_pts_per_topic )
+            publishId++;
+            if ( publishId == numberPointsPerTopic )
             {
-                pub_idx_size = 0;
-                pcl::toROSMsg( pc_rgb, ros_pc_msg );
-                ros_pc_msg.header.frame_id = "world";       
-                ros_pc_msg.header.stamp = ros::Time::now(); 
+                publishId = 0;
+                pcl::toROSMsg( colorPointcloud, rosPointcloudMsg );
+                rosPointcloudMsg.header.frame_id = "world";       
+                rosPointcloudMsg.header.stamp = ros::Time::now(); 
                 if ( m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ] == nullptr )
                 {
                     m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ] =
                         std::make_shared< ros::Publisher >( m_ros_node_handle.advertise< sensor_msgs::PointCloud2 >(
                             std::string( "/RGB_map_" ).append( std::to_string( cur_topic_idx ) ), 100 ) );
                 }
-                m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ]->publish( ros_pc_msg );
+                m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ]->publish( rosPointcloudMsg );
                 std::this_thread::sleep_for( std::chrono::microseconds( sleep_time_aft_pub ) );
                 ros::spinOnce();
                 cur_topic_idx++;
             }
         }
 
-        pc_rgb.resize( pub_idx_size );
-        pcl::toROSMsg( pc_rgb, ros_pc_msg );
-        ros_pc_msg.header.frame_id = "world";       
-        ros_pc_msg.header.stamp = ros::Time::now(); 
+        colorPointcloud.resize( publishId );
+        pcl::toROSMsg( colorPointcloud, rosPointcloudMsg );
+        rosPointcloudMsg.header.frame_id = "world";       
+        rosPointcloudMsg.header.stamp = ros::Time::now(); 
         if ( m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ] == nullptr )
         {
             m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ] =
@@ -1045,21 +1035,21 @@ void IMUFusion::service_pub_rgb_maps()
         }
         std::this_thread::sleep_for( std::chrono::microseconds( sleep_time_aft_pub ) );
         ros::spinOnce();
-        m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ]->publish( ros_pc_msg );
+        m_pub_rgb_render_pointcloud_ptr_vec[ cur_topic_idx ]->publish( rosPointcloudMsg );
         cur_topic_idx++;
         if ( cur_topic_idx >= 45 ) // Maximum pointcloud topics = 45.
         {
-            number_of_pts_per_topic *= 1.5;
+            numberPointsPerTopic *= 1.5;
             sleep_time_aft_pub *= 1.5;
         }
     }
 }
 
-void IMUFusion::publish_render_pts( ros::Publisher &pts_pub, GlobalMap &m_map_rgb_pts )
+void IMUFusion::publishRenderPoints( ros::Publisher &pts_pub, GlobalMap &m_map_rgb_pts )
 {
-    pcl::PointCloud< pcl::PointXYZRGB > pc_rgb;
-    sensor_msgs::PointCloud2            ros_pc_msg;
-    pc_rgb.reserve( 1e7 );
+    pcl::PointCloud< pcl::PointXYZRGB > colorPointcloud;
+    sensor_msgs::PointCloud2            rosPointcloudMsg;
+    colorPointcloud.reserve( 1e7 );
     m_map_rgb_pts.m_mutex_m_box_recent_hitted->lock();
     std::unordered_set< std::shared_ptr< RGBVoxel > > boxes_recent_hitted = m_map_rgb_pts.m_voxels_recent_visited;
     m_map_rgb_pts.m_mutex_m_box_recent_hitted->unlock();
@@ -1078,44 +1068,28 @@ void IMUFusion::publish_render_pts( ros::Publisher &pts_pub, GlobalMap &m_map_rg
             pt.b = rgb_pt->m_rgb[ 0 ];
             if ( rgb_pt->m_N_rgb > m_pub_pt_minimum_views )
             {
-                pc_rgb.points.push_back( pt );
+                colorPointcloud.points.push_back( pt );
             }
         }
     }
-    pcl::toROSMsg( pc_rgb, ros_pc_msg );
-    ros_pc_msg.header.frame_id = "world";       // world; camera_init
-    ros_pc_msg.header.stamp = ros::Time::now(); //.fromSec(last_timestamp_lidar);
-    pts_pub.publish( ros_pc_msg );
-}
-
-char IMUFusion::cv_keyboard_callback()
-{
-    char c = cv_wait_key( 1 );
-    // return c;
-    if ( c == 's' || c == 'S' )
-    {
-        scope_color( ANSI_COLOR_GREEN_BOLD );
-        cout << "I capture the keyboard input!!!" << endl;
-        // m_map_rgb_pts.save_and_display_pointcloud( m_map_output_dir, std::string("/rgb_pt"), std::max(m_pub_pt_minimum_views, 5) );
-        m_map_rgb_pts.save_and_display_pointcloud( m_map_output_dir, std::string("/rgb_pt"), m_pub_pt_minimum_views  );
-    }
-    return c;
+    pcl::toROSMsg( colorPointcloud, rosPointcloudMsg );
+    rosPointcloudMsg.header.frame_id = "world";       // world; camera_init
+    rosPointcloudMsg.header.stamp = ros::Time::now(); //.fromSec(last_timestamp_lidar);
+    pts_pub.publish( rosPointcloudMsg );
 }
 
 // ANCHOR -  service_VIO_update
-void IMUFusion::service_VIO_update()
+void IMUFusion::serviceVIOUpdate()
 {
     // Init cv windows for debug
-    op_track.set_intrinsic( g_cam_K, g_cam_dist * 0, cv::Size( m_vio_image_width / m_vio_scale_factor, m_vio_image_heigh / m_vio_scale_factor ) );
-    op_track.m_maximum_vio_tracked_pts = m_maximum_vio_tracked_pts;
-    m_map_rgb_pts.m_minimum_depth_for_projection = m_tracker_minimum_depth;
-    m_map_rgb_pts.m_maximum_depth_for_projection = m_tracker_maximum_depth;
-    cv::imshow( "Control panel", generate_control_panel_img().clone() );
+    m_optialTracker.setIntrinsic( g_cam_K, g_cam_dist * 0, cv::Size( m_vioImageWidth / m_vio_scale_factor, m_vioImageHeight / m_vio_scale_factor ) );
+    m_optialTracker.m_maximum_vio_tracked_pts = m_maximum_vio_tracked_pts;
+    m_mapColorPoints.m_minimum_depth_for_projection = m_tracker_minimum_depth;
+    m_mapColorPoints.m_maximum_depth_for_projection = m_tracker_maximum_depth;
     Common_tools::Timer tim;
     cv::Mat             img_get;
     while ( ros::ok() )
     {
-        cv_keyboard_callback();
         while ( g_camera_lidar_queue.m_if_have_lidar_data == 0 )
         {
             ros::spinOnce();
@@ -1132,11 +1106,11 @@ void IMUFusion::service_VIO_update()
             continue;
         }
         m_camera_data_mutex.lock();
-        while ( m_queue_image_with_pose.size() > m_maximum_image_buffer )
+        while ( m_queue_image_with_pose.size() > m_maximumImageBuffer )
         {
             cout << ANSI_COLOR_BLUE_BOLD << "=== Pop image! current queue size = " << m_queue_image_with_pose.size() << " ===" << ANSI_COLOR_RESET
                  << endl;
-            op_track.track_img( m_queue_image_with_pose.front(), -20 );
+            m_optialTracker.trackImg( m_queue_image_with_pose.front(), -20 );
             m_queue_image_with_pose.pop_front();
         }
 
@@ -1154,14 +1128,14 @@ void IMUFusion::service_VIO_update()
             std::vector< cv::Point2f >                pts_2d_vec;
             std::vector< std::shared_ptr< RGBPoints > > rgb_pts_vec;
             // while ( ( m_map_rgb_pts.is_busy() ) || ( ( m_map_rgb_pts.m_rgb_pts_vec.size() <= 100 ) ) )
-            while ( ( ( m_map_rgb_pts.m_rgb_pts_vec.size() <= 100 ) ) )
+            while ( ( ( m_mapColorPoints.m_ColorPointsVec.size() <= 100 ) ) )
             {
                 ros::spinOnce();
                 std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
             }
-            set_image_pose( img_pose, g_lio_state ); // For first frame pose, we suppose that the motion is static.
-            m_map_rgb_pts.selection_points_for_projection( img_pose, &rgb_pts_vec, &pts_2d_vec, m_track_windows_size / m_vio_scale_factor );
-            op_track.init( img_pose, rgb_pts_vec, pts_2d_vec );
+            setImagePose( img_pose, g_lio_state ); // For first frame pose, we suppose that the motion is static.
+            m_mapColorPoints.selection_points_for_projection( img_pose, &rgb_pts_vec, &pts_2d_vec, m_trackWindowsSize / m_vio_scale_factor );
+            m_optialTracker.init( img_pose, rgb_pts_vec, pts_2d_vec );
             g_camera_frame_idx++;
             continue;
         }
@@ -1173,7 +1147,6 @@ void IMUFusion::service_VIO_update()
             ros::spinOnce();
             std::this_thread::sleep_for( std::chrono::milliseconds( THREAD_SLEEP_TIM ) );
             std::this_thread::yield();
-            cv_keyboard_callback();
         }
         g_cost_time_logger.record( tim, "Wait" );
         m_mutex_lio_process.lock();
@@ -1181,15 +1154,15 @@ void IMUFusion::service_VIO_update()
         tim.tic( "Track_img" );
         StatesGroup state_out;
         m_cam_measurement_weight = std::max( 0.001, std::min( 5.0 / m_number_of_new_visited_voxel, 0.01 ) );
-        if ( vio_preintegration( g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_c2i ) == false )
+        if ( vioPreintegration( g_lio_state, state_out, img_pose->m_timestamp + g_lio_state.td_ext_c2i ) == false )
         {
             m_mutex_lio_process.unlock();
             continue;
         }
         // state_out = g_lio_state;
-        set_image_pose( img_pose, state_out );
+        setImagePose( img_pose, state_out );
 
-        op_track.track_img( img_pose, -20 );
+        m_optialTracker.trackImg( img_pose, -20 );
         g_cost_time_logger.record( tim, "Track_img" );
         // cout << "Track_img cost " << tim.toc( "Track_img" ) << endl;
         tim.tic( "Ransac" );
@@ -1201,7 +1174,7 @@ void IMUFusion::service_VIO_update()
         StatesGroup::display(state_out);
 
         // ANCHOR -  remove point using PnP.
-        if ( op_track.remove_outlier_using_ransac_pnp( img_pose ) == 0 )
+        if ( m_optialTracker.removeOutlierRansac( img_pose ) == 0 )
         {
             cout << ANSI_COLOR_RED_BOLD << "****** Remove_outlier_using_ransac_pnp error*****" << ANSI_COLOR_RESET << endl;
         }
@@ -1211,17 +1184,17 @@ void IMUFusion::service_VIO_update()
         wait_render_thread_finish();
 
         
-        res_esikf = vio_esikf( state_out, op_track );
+        res_esikf = vioEsikf( state_out, m_optialTracker );
         std::cout << "after esikf !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
         StatesGroup::display(state_out);
 
         g_cost_time_logger.record( tim, "Vio_f2f" );
         tim.tic( "Vio_f2m" );
-        res_photometric = vio_photometric(state_out, op_track, img_pose );
+        res_photometric = vioPhotometric(state_out, m_optialTracker, img_pose );
         g_cost_time_logger.record( tim, "Vio_f2m" );
         g_lio_state = state_out;
         print_dash_board();
-        set_image_pose( img_pose, state_out );
+        setImagePose( img_pose, state_out );
 
         if ( 1 )
         {
@@ -1229,19 +1202,19 @@ void IMUFusion::service_VIO_update()
             // m_map_rgb_pts.render_pts_in_voxels(img_pose, m_last_added_rgb_pts_vec);
             if ( 1 ) // Using multiple threads for rendering
             {
-                m_map_rgb_pts.m_if_get_all_pts_in_boxes_using_mp = 0;
+                m_mapColorPoints.m_if_get_all_pts_in_boxes_using_mp = 0;
                 // m_map_rgb_pts.render_pts_in_voxels_mp(img_pose, &m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
                 // img_pose->m_timestamp);
                 m_render_thread = std::make_shared< std::shared_future< void > >( m_thread_pool_ptr->commit_task(
-                    render_pts_in_voxels_mp, img_pose, &m_map_rgb_pts.m_voxels_recent_visited, img_pose->m_timestamp ) );
+                    render_pts_in_voxels_mp, img_pose, &m_mapColorPoints.m_voxels_recent_visited, img_pose->m_timestamp ) );
             }
             else
             {
-                m_map_rgb_pts.m_if_get_all_pts_in_boxes_using_mp = 0;
+                m_mapColorPoints.m_if_get_all_pts_in_boxes_using_mp = 0;
                 // m_map_rgb_pts.render_pts_in_voxels( img_pose, m_map_rgb_pts.m_rgb_pts_in_recent_visited_voxels,
                 // img_pose->m_timestamp );
             }
-            m_map_rgb_pts.m_last_updated_frame_idx = img_pose->m_frame_idx;
+            m_mapColorPoints.m_last_updated_frame_idx = img_pose->m_frame_idx;
             g_cost_time_logger.record( tim, "Render" );
 
             tim.tic( "Mvs_record" );
@@ -1255,8 +1228,8 @@ void IMUFusion::service_VIO_update()
         dump_lio_state_to_log( m_lio_state_fp );
         m_mutex_lio_process.unlock();
         // cout << "Solve image pose cost " << tim.toc("Solve_pose") << endl;
-        m_map_rgb_pts.update_pose_for_projection( img_pose, -0.4 );
-        op_track.update_and_append_track_pts( img_pose, m_map_rgb_pts, m_track_windows_size / m_vio_scale_factor, 1000000 );
+        m_mapColorPoints.update_pose_for_projection( img_pose, -0.4 );
+        m_optialTracker.update_and_append_track_pts( img_pose, m_mapColorPoints, m_trackWindowsSize / m_vio_scale_factor, 1000000 );
         g_cost_time_logger.record( tim, "Frame" );
         double frame_cost = tim.toc( "Frame" );
         g_image_vec.push_back( img_pose );
@@ -1269,15 +1242,15 @@ void IMUFusion::service_VIO_update()
         tim.tic( "Pub" );
         double display_cost_time = std::accumulate( frame_cost_time_vec.begin(), frame_cost_time_vec.end(), 0.0 ) / frame_cost_time_vec.size();
         g_vio_frame_cost_time = display_cost_time;
-        publish_render_pts( m_pub_render_rgb_pts, m_map_rgb_pts );
-        publish_camera_odom( img_pose, message_time );
+        publishRenderPoints( m_pub_render_rgb_pts, m_mapColorPoints );
+        publishCameraOdom( img_pose, message_time );
         // publish_track_img( op_track.m_debug_track_img, display_cost_time );
-        publish_track_img( img_pose->m_raw_img, display_cost_time );
-        publish_track_pts(op_track);
+        publishTrackImg( img_pose->m_raw_img, display_cost_time );
+        publishTrackPoints(m_optialTracker);
 
         if ( m_if_pub_raw_img )
         {
-            publish_raw_img( img_pose->m_raw_img );
+            publishRawImg( img_pose->m_raw_img );
         }
 
         if ( g_camera_lidar_queue.m_if_dump_log )

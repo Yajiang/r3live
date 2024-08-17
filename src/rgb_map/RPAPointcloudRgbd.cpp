@@ -100,7 +100,7 @@ int RGBPoints::update_rgb(const vec_3 &rgb, const double obs_dis, const vec_3 ob
 
 void GlobalMap::clear()
 {
-    m_rgb_pts_vec.clear();
+    m_ColorPointsVec.clear();
 }
 
 void GlobalMap::set_minmum_dis(double minimum_dis)
@@ -127,11 +127,11 @@ GlobalMap::GlobalMap( int if_start_service )
              << "GB). I recommend you to add more physical memory for improving the overall performance of R3LIVE." << endl;
         cout << "+++++++++++++++++++++++++++++++++++++++++++++++++++" << endl;
         std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
-        m_rgb_pts_vec.reserve( 1e8 );
+        m_ColorPointsVec.reserve( 1e8 );
     }
     else
     {
-        m_rgb_pts_vec.reserve( 1e9 );
+        m_ColorPointsVec.reserve( 1e9 );
     }
     // m_rgb_pts_in_recent_visited_voxels.reserve( 1e6 );
     if ( if_start_service )
@@ -301,8 +301,8 @@ int GlobalMap::append_points_to_global_map(pcl::PointCloud<T> &pc_in, double  ad
         std::shared_ptr<RGBPoints> pt_rgb = std::make_shared<RGBPoints>();
         pt_rgb->set_pos(vec_3(pc_in.points[pt_idx].x, pc_in.points[pt_idx].y, pc_in.points[pt_idx].z));
         // pt_rgb->set_pos(vec_3(grid_x*m_minimum_pts_size,grid_y*m_minimum_pts_size,grid_z*m_minimum_pts_size));
-        pt_rgb->m_pt_index = m_rgb_pts_vec.size();
-        m_rgb_pts_vec.push_back(pt_rgb);
+        pt_rgb->m_pt_index = m_ColorPointsVec.size();
+        m_ColorPointsVec.push_back(pt_rgb);
         m_hashmap_3d_pts.Insert(grid_x, grid_y, grid_z, pt_rgb);
         box_ptr->add_pt(pt_rgb);
         if (pts_added_vec != nullptr)
@@ -448,7 +448,7 @@ void GlobalMap::render_with_a_image(std::shared_ptr<ImageFrame> &img_ptr, int if
     }
     else
     {
-        pts_for_render = m_rgb_pts_vec;
+        pts_for_render = m_ColorPointsVec;
     }
     render_pts_in_voxels(img_ptr, pts_for_render);
 }
@@ -503,7 +503,7 @@ void GlobalMap::selection_points_for_projection(std::shared_ptr<ImageFrame> &ima
     }
     else
     {
-        pts_for_projection = m_rgb_pts_vec;
+        pts_for_projection = m_ColorPointsVec;
     }
     int pts_size = pts_for_projection.size();
     for (int pt_idx = 0; pt_idx < pts_size; pt_idx += skip_step)
@@ -571,7 +571,7 @@ void GlobalMap::save_to_pcd(std::string dir_name, std::string _file_name, int sa
     cout << "Save Rgb points to " << file_name << endl;
     fflush(stdout);
     pcl::PointCloud<pcl::PointXYZRGB> pc_rgb;
-    long pt_size = m_rgb_pts_vec.size();
+    long pt_size = m_ColorPointsVec.size();
     pc_rgb.resize(pt_size);
     long pt_count = 0;
     for (long i = pt_size - 1; i > 0; i--)
@@ -583,17 +583,17 @@ void GlobalMap::save_to_pcd(std::string dir_name, std::string _file_name, int sa
             fflush(stdout);
         }
 
-        if (m_rgb_pts_vec[i]->m_N_rgb < save_pts_with_views)
+        if (m_ColorPointsVec[i]->m_N_rgb < save_pts_with_views)
         {
             continue;
         }
         pcl::PointXYZRGB pt;
-        pc_rgb.points[ pt_count ].x = m_rgb_pts_vec[ i ]->m_pos[ 0 ];
-        pc_rgb.points[ pt_count ].y = m_rgb_pts_vec[ i ]->m_pos[ 1 ];
-        pc_rgb.points[ pt_count ].z = m_rgb_pts_vec[ i ]->m_pos[ 2 ];
-        pc_rgb.points[ pt_count ].r = m_rgb_pts_vec[ i ]->m_rgb[ 2 ];
-        pc_rgb.points[ pt_count ].g = m_rgb_pts_vec[ i ]->m_rgb[ 1 ];
-        pc_rgb.points[ pt_count ].b = m_rgb_pts_vec[ i ]->m_rgb[ 0 ];
+        pc_rgb.points[ pt_count ].x = m_ColorPointsVec[ i ]->m_pos[ 0 ];
+        pc_rgb.points[ pt_count ].y = m_ColorPointsVec[ i ]->m_pos[ 1 ];
+        pc_rgb.points[ pt_count ].z = m_ColorPointsVec[ i ]->m_pos[ 2 ];
+        pc_rgb.points[ pt_count ].r = m_ColorPointsVec[ i ]->m_rgb[ 2 ];
+        pc_rgb.points[ pt_count ].g = m_ColorPointsVec[ i ]->m_rgb[ 1 ];
+        pc_rgb.points[ pt_count ].b = m_ColorPointsVec[ i ]->m_rgb[ 0 ];
         pt_count++;
     }
     cout << ANSI_DELETE_CURRENT_LINE  << "Saving offline map 100% ..." << endl;

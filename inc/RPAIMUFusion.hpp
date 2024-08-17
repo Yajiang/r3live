@@ -2,7 +2,7 @@
 #include "RPAColorMapTracker.hpp"
 #include "RPAImageFrame.hpp"
 #include "RPAPointcloudRgbd.hpp"
-#include "loam/RPAIMUProcessing.hpp"
+#include "RPAIMUProcessing.hpp"
 #include "tools_color_printf.hpp"
 #include "tools_eigen.hpp"
 #include "tools_logger.hpp"
@@ -96,7 +96,7 @@ public:
     double T1[MAXN], T2[MAXN], s_plot[MAXN], s_plot2[MAXN], s_plot3[MAXN], s_plot4[MAXN], s_plot5[MAXN], s_plot6[MAXN];
     int time_log_counter = 0;
     /// IMU relative variables
-    std::mutex mtx_buffer;
+    std::mutex mtxBuffer;
     std::condition_variable sig_buffer;
     bool lidar_pushed = false;
     bool flg_exit = false;
@@ -106,7 +106,7 @@ public:
     double cube_len = 0.0;
     double lidar_end_time = 0.0;
     double last_timestamp_lidar = -1;
-    double last_timestamp_imu = -1;
+    double lastImuTimestamp = -1;
     double HALF_FOV_COS = 0.0;
     double FOV_DEG = 0.0;
     double res_mean_last = 0.05;
@@ -116,8 +116,8 @@ public:
     double kdtree_incremental_time, kdtree_search_time;
 
     std::deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
-    std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_lio;
-    std::deque<sensor_msgs::Imu::ConstPtr> imu_buffer_vio;
+    std::deque<sensor_msgs::Imu::ConstPtr> imuBufferLio;
+    std::deque<sensor_msgs::Imu::ConstPtr> imuBufferVio;
 
     //surf feature in map
     PointCloudXYZINormal::Ptr featsFromMap;     
@@ -185,15 +185,15 @@ public:
     std::mutex g_mutex_render;
     std::shared_ptr<ImageFrame> g_last_image_pose_for_render = nullptr;
     std::list<double> frame_cost_time_vec;
-    ColorMapTracker op_track;    
-    GlobalMap m_map_rgb_pts;
-    int m_maximum_image_buffer = 2;
-    int m_track_windows_size = 50;
-    double m_minumum_rgb_pts_size = 0.05;
-    double m_vio_image_width = 0;
-    double m_vio_image_heigh = 0;
-    int m_if_estimate_i2c_extrinsic = 1;
-    int m_if_estimate_intrinsic = 1;
+    ColorMapTracker m_optialTracker;    
+    GlobalMap m_mapColorPoints;
+    int m_maximumImageBuffer = 2;
+    int m_trackWindowsSize = 50;
+    double m_minumumColorPointsSize = 0.05;
+    double m_vioImageWidth = 0;
+    double m_vioImageHeight = 0;
+    int m_ifEstimateI2CExtrinsic = 1;
+    int m_ifEstimateIntrinsic = 1;
     double m_control_image_freq =  100; 
     int m_maximum_vio_tracked_pts = 300;
     int m_lio_update_point_step = 1;
@@ -223,33 +223,31 @@ public:
     std::shared_ptr<std::shared_future<void> > m_render_thread = nullptr;
     
     // VIO subsystem related
-    void load_vio_parameters();
-    void set_initial_camera_parameter(StatesGroup &state,
+    void loadVIOParameters();
+    void setInitialCameraParameter(StatesGroup &state,
                                           double * camera_intrinsic_data,
                                           double * camera_dist_data,
                                           double * imu_camera_ext_R ,
                                           double * imu_camera_ext_t ,
                                           double cam_k_scale);
-    void process_image(cv::Mat & image, double msg_time);
-    void image_callback(const sensor_msgs::ImageConstPtr &msg);
-    void image_comp_callback(const sensor_msgs::CompressedImageConstPtr &msg);
-    void set_image_pose( std::shared_ptr<ImageFrame> & image_pose, const StatesGroup & state );
-    void publish_camera_odom(std::shared_ptr<ImageFrame> & image, double msg_time);
-    void publish_track_img(cv::Mat & img, double frame_cost_time);
-    void publish_raw_img(cv::Mat & img);
-    void publish_track_pts( ColorMapTracker & tracker  );
-    bool vio_preintegration( StatesGroup & state_in, StatesGroup & state_out, double current_frame_time );
-    bool vio_esikf(StatesGroup &state_in, ColorMapTracker &op_track);
-    bool vio_photometric(StatesGroup &state_in, ColorMapTracker &op_track, std::shared_ptr<ImageFrame> & image);
-    void service_VIO_update();
-    void service_process_img_buffer();
-    void service_pub_rgb_maps();
-    char cv_keyboard_callback();
-    void set_initial_state_cov(StatesGroup &stat);
-    cv::Mat generate_control_panel_img();
+    void processImage(cv::Mat & image, double msg_time);
+    void imageCallback(const sensor_msgs::ImageConstPtr &msg);
+    void imageCompressedCallback(const sensor_msgs::CompressedImageConstPtr &msg);
+    void setImagePose( std::shared_ptr<ImageFrame> & image_pose, const StatesGroup & state );
+    void publishCameraOdom(std::shared_ptr<ImageFrame> & image, double msg_time);
+    void publishTrackImg(cv::Mat & img, double frame_cost_time);
+    void publishRawImg(cv::Mat & img);
+    void publishTrackPoints( ColorMapTracker & tracker  );
+    bool vioPreintegration( StatesGroup & state_in, StatesGroup & state_out, double current_frame_time );
+    bool vioEsikf(StatesGroup &state_in, ColorMapTracker &op_track);
+    bool vioPhotometric(StatesGroup &state_in, ColorMapTracker &op_track, std::shared_ptr<ImageFrame> & image);
+    void serviceVIOUpdate();
+    void serviceProcessImgBuffer();
+    void servicePubColorMaps();
+    void setInitialStateCov(StatesGroup &stat);
     // ANCHOR -  service_pub_rgb_maps
     
-    void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in);
+    void imuCallback(const sensor_msgs::Imu::ConstPtr &msg_in);
 
     bool syncPackages(MeasureGroup &meas);
     
@@ -285,10 +283,10 @@ public:
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
-        sub_imu = m_ros_node_handle.subscribe(IMU_topic.c_str(), 2000000, &IMUFusion::imu_cbk, this, ros::TransportHints().tcpNoDelay());
-        sub_pcl = m_ros_node_handle.subscribe(LiDAR_pointcloud_topic.c_str(), 2000000, &IMUFusion::feat_points_cbk, this, ros::TransportHints().tcpNoDelay());
-        sub_img = m_ros_node_handle.subscribe(IMAGE_topic.c_str(), 1000000, &IMUFusion::image_callback, this, ros::TransportHints().tcpNoDelay());
-        sub_img_comp = m_ros_node_handle.subscribe(IMAGE_topic_compressed.c_str(), 1000000, &IMUFusion::image_comp_callback, this, ros::TransportHints().tcpNoDelay());
+        sub_imu = m_ros_node_handle.subscribe(IMU_topic.c_str(), 2000000, &IMUFusion::imuCallback, this, ros::TransportHints().tcpNoDelay());
+        sub_pcl = m_ros_node_handle.subscribe(LiDAR_pointcloud_topic.c_str(), 2000000, &IMUFusion::featurePointsCallback, this, ros::TransportHints().tcpNoDelay());
+        sub_img = m_ros_node_handle.subscribe(IMAGE_topic.c_str(), 1000000, &IMUFusion::imageCallback, this, ros::TransportHints().tcpNoDelay());
+        sub_img_comp = m_ros_node_handle.subscribe(IMAGE_topic_compressed.c_str(), 1000000, &IMUFusion::imageCompressedCallback, this, ros::TransportHints().tcpNoDelay());
 
         m_ros_node_handle.getParam("/initial_pose", m_initial_pose);
         m_pub_rgb_render_pointcloud_ptr_vec.resize(1e3);
@@ -300,18 +298,18 @@ public:
                                Common_tools::get_home_folder().append( "/r3live_output" ) );
             get_ros_parameter( m_ros_node_handle, "r3live_common/append_global_map_point_step", m_append_global_map_point_step, 4 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/recent_visited_voxel_activated_time", m_recent_visited_voxel_activated_time, 0.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/maximum_image_buffer", m_maximum_image_buffer, 20000 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/maximum_image_buffer", m_maximumImageBuffer, 20000 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_minimum_depth", m_tracker_minimum_depth, 150.0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/tracker_maximum_depth", m_tracker_maximum_depth, 500.0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/track_windows_size", m_track_windows_size, 40 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/minimum_pts_size", m_minumum_rgb_pts_size, 0.05 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/track_windows_size", m_trackWindowsSize, 40 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/minimum_pts_size", m_minumumColorPointsSize, 0.05 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/record_offline_map", m_if_record_mvs, 0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/pub_pt_minimum_views", m_pub_pt_minimum_views, 5 );
 
             get_ros_parameter( m_ros_node_handle, "r3live_common/image_downsample_ratio", m_image_downsample_ratio, 1.0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/esikf_iter_times", esikf_iter_times, 2 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/estimate_i2c_extrinsic", m_if_estimate_i2c_extrinsic, 0 );
-            get_ros_parameter( m_ros_node_handle, "r3live_common/estimate_intrinsic", m_if_estimate_intrinsic, 0 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/estimate_i2c_extrinsic", m_ifEstimateI2CExtrinsic, 0 );
+            get_ros_parameter( m_ros_node_handle, "r3live_common/estimate_intrinsic", m_ifEstimateIntrinsic, 0 );
             get_ros_parameter( m_ros_node_handle, "r3live_common/maximum_vio_tracked_pts", m_maximum_vio_tracked_pts, 600 );
         }
         if ( 1 )
@@ -336,7 +334,7 @@ public:
         if ( 1 )
         {
             scope_color( ANSI_COLOR_BLUE );
-            load_vio_parameters();
+            loadVIOParameters();
         }
         if(!Common_tools::if_file_exist(m_map_output_dir))
         {
@@ -345,8 +343,8 @@ public:
         }
         m_thread_pool_ptr = std::make_shared<Common_tools::ThreadPool>(6, true, false); // At least 5 threads are needs, here we allocate 6 threads.
         g_cost_time_logger.init_log( std::string(m_map_output_dir).append("/cost_time_logger.log"));
-        m_map_rgb_pts.set_minmum_dis(m_minumum_rgb_pts_size);
-        m_map_rgb_pts.m_recent_visited_voxel_activated_time = m_recent_visited_voxel_activated_time;
+        m_mapColorPoints.set_minmum_dis(m_minumumColorPointsSize);
+        m_mapColorPoints.m_recent_visited_voxel_activated_time = m_recent_visited_voxel_activated_time;
         featsFromMap = boost::make_shared<PointCloudXYZINormal>();
         cube_points_add = boost::make_shared<PointCloudXYZINormal>();
         laserCloudFullRes2 = boost::make_shared<PointCloudXYZINormal>();
@@ -360,7 +358,7 @@ public:
 
         m_lio_state_fp = fopen( std::string(m_map_output_dir).append("/lic_lio.log").c_str(), "w+");
         m_lio_costtime_fp = fopen(std::string(m_map_output_dir).append("/lic_lio_costtime.log").c_str(), "w+");
-        m_thread_pool_ptr->commit_task(&IMUFusion::service_LIO_update, this);
+        m_thread_pool_ptr->commit_task(&IMUFusion::serviceLIOUpdate, this);
              
     }
     ~IMUFusion(){};
@@ -377,15 +375,16 @@ public:
         po[1] = p_global(1);
         po[2] = p_global(2);
     }
-    void RGBpointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
+    void colorPointBodyToWorld(PointType const *const pi, pcl::PointXYZI *const po);
     int get_cube_index(const int &i, const int &j, const int &k);
     bool center_in_FOV(Eigen::Vector3f cube_p);
     bool if_corner_in_FOV(Eigen::Vector3f cube_p);
     void lasermap_fov_segment();
-    void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
+    void featurePointsCallback(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void wait_render_thread_finish();
     bool getPointcloudFromROS(sensor_msgs::PointCloud2::ConstPtr & msg, pcl::PointCloud<pcl::PointXYZINormal> & pcl_pc);
-    int service_LIO_update();
-    void publish_render_pts( ros::Publisher &pts_pub, GlobalMap &m_map_rgb_pts );
+    int serviceLIOUpdate();
+    void publishRenderPoints( ros::Publisher &pts_pub, GlobalMap &m_map_rgb_pts );
     void print_dash_board();
+    static void printFieldName(sensor_msgs::PointCloud2::ConstPtr &msg);
 };

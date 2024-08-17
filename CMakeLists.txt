@@ -64,7 +64,6 @@ include_directories(
   ./inc/FOV_Checker
   ./inc/kd_tree
   ./inc/lib_sophus
-  ./inc/loam
   ./inc/optical_flow
   ./inc/rgb_map
   ./inc/tools
@@ -79,14 +78,14 @@ message(STATUS "===== OpenCV ersion: ${OpenCV_VERSION}  =====")
 message(STATUS "===== OpenCV libraries: ${OpenCV_LIBS} =====")
 message(STATUS "===== OpenCV include path: ${OpenCV_INCLUDE_DIRS} =====")
 
-add_executable(revopoint_pointcloud_handler src/loam/RPAPointcloudHandler)
+add_executable(revopoint_pointcloud_handler src/RPAPointcloudHandler)
 target_link_libraries(revopoint_pointcloud_handler ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(revopoint_mapping src/RPARosNode.cpp 
                 src/RPALIOSubsystem.cpp
                 src/kd_tree/ikd_Tree.cpp
                 src/FOV_Checker/RPAFOVChecker.cpp 
-                src/loam/RPAIMUHandler.cpp
+                src/RPAIMUHandler.cpp
                 # From VIO
                 src/RPAVIOSubsystem.cpp
                 src/optical_flow/lkpyramid.cpp

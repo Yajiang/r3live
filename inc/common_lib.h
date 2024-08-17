@@ -325,9 +325,9 @@ public:
     Eigen::Matrix3d rot_ext_c2i;                             // [18-20] Extrinsic between IMU frame to Camera frame on rotation.
     Eigen::Vector3d pos_ext_c2i;                             // [21-23] Extrinsic between IMU frame to Camera frame on position.
     double          td_ext_c2i_delta;                        // [24]    Extrinsic between IMU frame to Camera frame on position.
-    vec_4           cam_intrinsic;                           // [25-28] Intrinsice of camera [fx, fy, cx, cy]
+    vec_4           camIntrinsic;                           // [25-28] Intrinsice of camera [fx, fy, cx, cy]
     Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES> cov; // states covariance
-    double last_update_time = 0;
+    double lastUpdateTime = 0;
     double          td_ext_c2i;
     StatesGroup()
     {
@@ -345,7 +345,7 @@ public:
 
         cov = Eigen::Matrix<double, DIM_OF_STATES, DIM_OF_STATES>::Identity() * INIT_COV;
         // cov.block(18, 18, 6,6) *= 0.1;
-        last_update_time = 0;
+        lastUpdateTime = 0;
         td_ext_c2i_delta = 0;
         td_ext_c2i = 0;
     }
@@ -366,13 +366,13 @@ public:
 #endif
 
         a.cov = this->cov;
-        a.last_update_time = this->last_update_time;
+        a.lastUpdateTime = this->lastUpdateTime;
 #if ENABLE_CAMERA_OBS                
         //Ext camera w.r.t. IMU
         a.rot_ext_c2i = this->rot_ext_c2i * Exp(  state_add(18), state_add(19), state_add(20) );
         a.pos_ext_c2i = this->pos_ext_c2i + state_add.block<3,1>( 21, 0 );
         a.td_ext_c2i_delta = this->td_ext_c2i_delta + state_add(24);
-        a.cam_intrinsic = this->cam_intrinsic + state_add.block(25, 0, 4, 1);
+        a.camIntrinsic = this->camIntrinsic + state_add.block(25, 0, 4, 1);
 #endif
         return a;
     }
@@ -392,7 +392,7 @@ public:
         this->rot_ext_c2i = this->rot_ext_c2i * Exp(  state_add(18), state_add(19), state_add(20));
         this->pos_ext_c2i = this->pos_ext_c2i + state_add.block<3,1>( 21, 0 );
         this->td_ext_c2i_delta = this->td_ext_c2i_delta + state_add(24);
-        this->cam_intrinsic = this->cam_intrinsic + state_add.block(25, 0, 4, 1);   
+        this->camIntrinsic = this->camIntrinsic + state_add.block(25, 0, 4, 1);   
 #endif
         return *this;
     }
@@ -414,7 +414,7 @@ public:
         a.block<3, 1>(18, 0) = SO3_LOG(rotd_ext_c2i);
         a.block<3, 1>(21, 0) = this->pos_ext_c2i - b.pos_ext_c2i;
         a(24) = this->td_ext_c2i_delta - b.td_ext_c2i_delta;
-        a.block<4, 1>(25, 0) = this->cam_intrinsic - b.cam_intrinsic;
+        a.block<4, 1>(25, 0) = this->camIntrinsic - b.camIntrinsic;
 #endif
         return a;
     }
@@ -423,7 +423,7 @@ public:
     {
         vec_3 angle_axis = SO3_LOG(state.rot_end) * 57.3;
         printf("%s |", str.c_str());
-        printf("[%.5f] | ", state.last_update_time);
+        printf("[%.5f] | ", state.lastUpdateTime);
         printf("(%.3f, %.3f, %.3f) | ", angle_axis(0), angle_axis(1), angle_axis(2));
         printf("(%.3f, %.3f, %.3f) | ", state.pos_end(0), state.pos_end(1), state.pos_end(2));
         printf("(%.3f, %.3f, %.3f) | ", state.vel_end(0), state.vel_end(1), state.vel_end(2));

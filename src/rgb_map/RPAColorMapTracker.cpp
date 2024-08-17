@@ -117,7 +117,7 @@ void ColorMapTracker::update_and_append_track_pts( std::shared_ptr< ImageFrame >
     }
 
     map_rgb.m_mutex_pts_vec->unlock();
-    update_last_tracking_vector_and_ids();
+    updateLastTrackingVectorAndIds();
     // cout << "Update points cost time = " << tim.toc() << endl;
 }
 
@@ -183,7 +183,7 @@ void ColorMapTracker::reject_error_tracking_pts( std::shared_ptr< ImageFrame > &
 //     return hist_equalized_image;
 // }
 
-void ColorMapTracker::track_img( std::shared_ptr< ImageFrame > &img_pose, double dis, int if_use_opencv )
+void ColorMapTracker::trackImg( std::shared_ptr< ImageFrame > &img_pose, double dis, int if_use_opencv )
 {
     Common_tools::Timer tim;
     m_current_frame = img_pose->m_img;
@@ -199,42 +199,42 @@ void ColorMapTracker::track_img( std::shared_ptr< ImageFrame > &img_pose, double
     tim.tic( "opTrack" );
     std::vector< uchar > status;
     std::vector< float > err;
-    m_current_tracked_pts = m_last_tracked_pts;
-    int before_track = m_last_tracked_pts.size();
-    if ( m_last_tracked_pts.size() < 30 )
+    m_current_tracked_pts = m_lastTrackedPoints;
+    int before_track = m_lastTrackedPoints.size();
+    if ( m_lastTrackedPoints.size() < 30 )
     {
         m_last_frame_time = m_current_frame_time;
-        std::cout << "m last tracked pts is"<<m_last_tracked_pts.size() <<  "less than 30" << std::endl; 
+        std::cout << "m last tracked pts is"<<m_lastTrackedPoints.size() <<  "less than 30" << std::endl; 
         return;
     }
 
-    m_lk_optical_flow_kernel->track_image( frame_gray, m_last_tracked_pts, m_current_tracked_pts, status, 2 );
-    reduce_vector( m_last_tracked_pts, status );
-    reduce_vector( m_old_ids, status );
+    m_lk_optical_flow_kernel->track_image( frame_gray, m_lastTrackedPoints, m_current_tracked_pts, status, 2 );
+    reduce_vector( m_lastTrackedPoints, status );
+    reduce_vector( m_oldIds, status );
     reduce_vector( m_current_tracked_pts, status );
 
-    int     after_track = m_last_tracked_pts.size();
+    int     after_track = m_lastTrackedPoints.size();
     cv::Mat mat_F;
 
     tim.tic( "Reject_F" );
-    unsigned int pts_before_F = m_last_tracked_pts.size();
-    mat_F = cv::findFundamentalMat( m_last_tracked_pts, m_current_tracked_pts, cv::FM_RANSAC, 1.0, 0.997, status );
+    unsigned int pts_before_F = m_lastTrackedPoints.size();
+    mat_F = cv::findFundamentalMat( m_lastTrackedPoints, m_current_tracked_pts, cv::FM_RANSAC, 1.0, 0.997, status );
     unsigned int size_a = m_current_tracked_pts.size();
-    reduce_vector( m_last_tracked_pts, status );
-    reduce_vector( m_old_ids, status );
+    reduce_vector( m_lastTrackedPoints, status );
+    reduce_vector( m_oldIds, status );
     reduce_vector( m_current_tracked_pts, status );
 
     m_map_rgb_pts_in_current_frame_pos.clear();
     double frame_time_diff = ( m_current_frame_time - m_last_frame_time );
-    std::cout << "m_last_tracked_pts size " << m_last_tracked_pts.size() << std::endl;
-    for ( uint i = 0; i < m_last_tracked_pts.size(); i++ )
+    std::cout << "m_last_tracked_pts size " << m_lastTrackedPoints.size() << std::endl;
+    for ( uint i = 0; i < m_lastTrackedPoints.size(); i++ )
     {
         if ( img_pose->if_2d_points_available( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y, 1.0, 0.05 ) )
         {
-            RGBPoints *rgb_pts_ptr = ( ( RGBPoints * ) m_rgb_pts_ptr_vec_in_last_frame[ m_old_ids[ i ] ] );
+            RGBPoints *rgb_pts_ptr = ( ( RGBPoints * ) m_colorPointsPtrVecInLastFrame[ m_oldIds[ i ] ] );
             m_map_rgb_pts_in_current_frame_pos[ rgb_pts_ptr ] = m_current_tracked_pts[ i ];
-            cv::Point2f pt_img_vel = ( m_current_tracked_pts[ i ] - m_last_tracked_pts[ i ] ) / frame_time_diff;
-            rgb_pts_ptr->m_img_pt_in_last_frame = vec_2( m_last_tracked_pts[ i ].x, m_last_tracked_pts[ i ].y );
+            cv::Point2f pt_img_vel = ( m_current_tracked_pts[ i ] - m_lastTrackedPoints[ i ] ) / frame_time_diff;
+            rgb_pts_ptr->m_img_pt_in_last_frame = vec_2( m_lastTrackedPoints[ i ].x, m_lastTrackedPoints[ i ].y );
             rgb_pts_ptr->m_img_pt_in_current_frame =
                 vec_2( m_current_tracked_pts[ i ].x, m_current_tracked_pts[ i ].y );
             rgb_pts_ptr->m_img_vel = vec_2( pt_img_vel.x, pt_img_vel.y );
@@ -249,13 +249,13 @@ void ColorMapTracker::track_img( std::shared_ptr< ImageFrame > &img_pose, double
     m_old_gray = frame_gray.clone();
     m_old_frame = m_current_frame;
     m_map_rgb_pts_in_last_frame_pos = m_map_rgb_pts_in_current_frame_pos;
-    update_last_tracking_vector_and_ids();
+    updateLastTrackingVectorAndIds();
 
     m_frame_idx++;
     m_last_frame_time = m_current_frame_time;
 }
 
-int ColorMapTracker::get_all_tracked_pts( std::vector< std::vector< cv::Point2f > > *img_pt_vec )
+int ColorMapTracker::getAllTrackedPoints( std::vector< std::vector< cv::Point2f > > *img_pt_vec )
 {
     int hit_count = 0;
     for ( auto it = m_map_id_pts_vec.begin(); it != m_map_id_pts_vec.end(); it++ )
@@ -274,7 +274,7 @@ int ColorMapTracker::get_all_tracked_pts( std::vector< std::vector< cv::Point2f 
     return hit_count;
 }
 
-int ColorMapTracker::remove_outlier_using_ransac_pnp( std::shared_ptr< ImageFrame > &img_pose, int if_remove_ourlier )
+int ColorMapTracker::removeOutlierRansac( std::shared_ptr< ImageFrame > &img_pose, int if_remove_ourlier )
 {
     Common_tools::Timer tim;
     tim.tic();
@@ -329,7 +329,7 @@ int ColorMapTracker::remove_outlier_using_ransac_pnp( std::shared_ptr< ImageFram
                 }
             }
         }
-        update_last_tracking_vector_and_ids();
+        updateLastTrackingVectorAndIds();
     }
 
     // cv::solvePnP(pt_3d_vec, pt_2d_vec, m_intrinsic, m_dist_coeffs * 0, r_vec, t_vec);

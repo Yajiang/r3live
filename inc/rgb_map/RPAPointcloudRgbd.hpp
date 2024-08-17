@@ -109,7 +109,7 @@ struct GlobalMap
     int                                                          m_map_major_version = R3LIVE_MAP_MAJOR_VERSION;
     int                                                          m_map_minor_version = R3LIVE_MAP_MINOR_VERSION;
     int                                                          m_if_get_all_pts_in_boxes_using_mp = 1;
-    std::vector< RGBPointsPtr >                    m_rgb_pts_vec;
+    std::vector< RGBPointsPtr >                    m_ColorPointsVec;
     // std::vector< RGB_pt_ptr >                    m_rgb_pts_in_recent_visited_voxels;
     std::shared_ptr< std::vector< RGBPointsPtr> >                  m_pts_rgb_vec_for_projection = nullptr;
     std::shared_ptr< std::mutex >                                m_mutex_pts_vec;
@@ -171,7 +171,7 @@ template < typename Archive >
 inline void save( Archive &ar, const GlobalMap &global_map, const unsigned int /*version*/ )
 {
     int vector_size;
-    vector_size = global_map.m_rgb_pts_vec.size();
+    vector_size = global_map.m_ColorPointsVec.size();
     ar << global_map.m_map_major_version;
     ar << global_map.m_map_minor_version;
     ar << global_map.m_minimum_pts_size;
@@ -180,8 +180,8 @@ inline void save( Archive &ar, const GlobalMap &global_map, const unsigned int /
     cout << ANSI_COLOR_YELLOW_BOLD;
     for ( int i = 0; i < vector_size; i++ )
     {
-        ar << ( *global_map.m_rgb_pts_vec[ i ] );
-        CV_Assert( global_map.m_rgb_pts_vec[ i ]->m_pt_index == i );
+        ar << ( *global_map.m_ColorPointsVec[ i ] );
+        CV_Assert( global_map.m_ColorPointsVec[ i ]->m_pt_index == i );
         if ( ( i % 10000 == 0 ) || ( i == vector_size - 1 ) )
         {
             cout << ANSI_DELETE_CURRENT_LINE << "Saving global map: " << ( i * 100.0 / (vector_size-1) ) << " %";
@@ -197,7 +197,7 @@ inline void load( Archive &ar, GlobalMap &global_map, const unsigned int /*versi
     Common_tools::Timer tim;
     tim.tic();
     int vector_size;
-    vector_size = global_map.m_rgb_pts_vec.size();
+    vector_size = global_map.m_ColorPointsVec.size();
     ar >> global_map.m_map_major_version;
     ar >> global_map.m_map_minor_version;
     ar >> global_map.m_minimum_pts_size;
@@ -210,8 +210,8 @@ inline void load( Archive &ar, GlobalMap &global_map, const unsigned int /*versi
         // printf_line;
         std::shared_ptr< RGBPoints > rgb_pt = std::make_shared< RGBPoints >();
         ar >> *rgb_pt;
-        CV_Assert( rgb_pt->m_pt_index == global_map.m_rgb_pts_vec.size() );
-        global_map.m_rgb_pts_vec.push_back( rgb_pt );
+        CV_Assert( rgb_pt->m_pt_index == global_map.m_ColorPointsVec.size() );
+        global_map.m_ColorPointsVec.push_back( rgb_pt );
         grid_x = std::round( rgb_pt->m_pos[ 0 ] / global_map.m_minimum_pts_size );
         grid_y = std::round( rgb_pt->m_pos[ 1 ] / global_map.m_minimum_pts_size );
         grid_z = std::round( rgb_pt->m_pos[ 2 ] / global_map.m_minimum_pts_size );

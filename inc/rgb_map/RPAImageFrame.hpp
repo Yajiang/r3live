@@ -12,19 +12,6 @@
 //https://www.opencv-srf.com/2018/02/histogram-equalization.html
 #include <boost/serialization/access.hpp>
 
-inline char cv_wait_key(int ms )
-{
-    static std::mutex cv_wait_key_mutex;
-    cv_wait_key_mutex.lock();
-    char c = cv::waitKey(ms);
-    if (c == 'p' || c == 'P' || c == ' ')
-    {
-        c = cv::waitKey(0);
-    }
-    cv_wait_key_mutex.unlock();
-    return c;
-}
-
 inline cv::Mat equalize_color_image(cv::Mat &image)
 {
     cv::Mat hist_equalized_image;

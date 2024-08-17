@@ -1,5 +1,6 @@
 #include <cmath>
 #include "RPAIMUProcessing.hpp"
+#include "util/RPALogger.h"
 #define COV_OMEGA_NOISE_DIAG 1e-1
 // #define COV_ACC_NOISE_DIAG 0.4
 #define COV_ACC_NOISE_DIAG 225
@@ -19,7 +20,7 @@
 
 double g_lidar_star_tim = 0;
 double g_imu_scale_factor = 1.00352;
-ImuHandler::ImuHandler() : b_first_frame_( true ), imu_need_init_( true ), last_imu_( nullptr ), start_timestamp_( -1 )
+ImuHandler::ImuHandler() : m_lastImu( nullptr ), m_startTimestamp( -1 )
 {
     Eigen::Quaterniond q( 0, 1, 0, 0 );
     Eigen::Vector3d    t( 0, 0, 0 );
@@ -39,7 +40,7 @@ ImuHandler::~ImuHandler()
 
 void ImuHandler::Reset()
 {
-    ROS_WARN( "Reset ImuProcess" );
+    RPA_DEBUG( "Reset ImuProcess" );
     angvel_last = Zero3d;
     cov_proc_noise = Eigen::Matrix< double, DIM_OF_PROC_N, 1 >::Zero();
 
@@ -48,13 +49,13 @@ void ImuHandler::Reset()
     mean_acc = Eigen::Vector3d( 0, 0, 0);
     mean_gyr = Eigen::Vector3d( 0, 0, 0 );
 
-    imu_need_init_ = true;
-    b_first_frame_ = true;
+    m_NeedInit = true;
+    m_IsFirstFrame = true;
     init_iter_num = 1;
 
-    last_imu_ = nullptr;
+    m_lastImu = nullptr;
 
-    start_timestamp_ = -1;
+    m_startTimestamp = -1;
     v_imu_.clear();
     IMU_pose.clear();
 
@@ -65,14 +66,14 @@ void ImuHandler::IMUInitial( const MeasureGroup &meas, StatesGroup &state_inout,
 {
     /** 1. initializing the gravity, gyro bias, acc and gyro covariance
      ** 2. normalize the acceleration measurenments to unit gravity **/
-    ROS_INFO( "IMU Initializing: %.1f %%", double( N ) / MAX_INI_COUNT * 100 );
+    RPA_DEBUG( "IMU Initializing: %.1f %%", double( N ) / MAX_INI_COUNT * 100 );
     Eigen::Vector3d cur_acc, cur_gyr;
 
-    if ( b_first_frame_ )
+    if ( m_IsFirstFrame )
     {
         Reset();
         N = 0;
-        b_first_frame_ = false;
+        m_IsFirstFrame = false;
     }
 
     for ( const auto &imu : meas.imu )
@@ -131,7 +132,7 @@ void ImuHandler::StatePropagate( const MeasureGroup &meas, StatesGroup &state_in
 {
     /*** add the imu of the last frame-tail to the of current frame-head ***/
     auto v_imu = meas.imu;
-    v_imu.push_front( last_imu_ );
+    v_imu.push_front( m_lastImu );
     // const double &imu_beg_time = v_imu.front()->header.stamp.toSec();
     const double &imu_end_time = v_imu.back()->header.stamp.toSec();
     const double &pcl_beg_time = meas.lidar_beg_time;
@@ -142,8 +143,8 @@ void ImuHandler::StatePropagate( const MeasureGroup &meas, StatesGroup &state_in
     const double &pcl_end_time = pcl_beg_time + pcl_out.points.back().curvature / double( 1000 );
     double        end_pose_dt = pcl_end_time - imu_end_time;
 
-    state_inout = IMUPreintegration( state_inout, v_imu, end_pose_dt );
-    last_imu_ = meas.imu.back();
+    state_inout = imuPreintegration( state_inout, v_imu, end_pose_dt );
+    m_lastImu = meas.imu.back();
 }
 
 float SigmoidPenalty(float x, float range)
@@ -155,7 +156,7 @@ float SigmoidPenalty(float x, float range)
 
 
 // Avoid abnormal state input
-bool CheckState( StatesGroup &state_inout )
+bool CheckAbnormalState( StatesGroup &state_inout )
 {
     bool is_fail = false;
     // {
@@ -213,11 +214,11 @@ void CheckInOutState( const StatesGroup &state_in, StatesGroup &state_inout )
 
 std::mutex g_imu_premutex;
 
-StatesGroup ImuHandler::IMUPreintegration( const StatesGroup &state_in, std::deque< sensor_msgs::Imu::ConstPtr > &v_imu, double end_pose_dt )
+StatesGroup ImuHandler::imuPreintegration( const StatesGroup &state_in, std::deque< sensor_msgs::Imu::ConstPtr > &v_imu, double end_pose_dt )
 {
     std::unique_lock< std::mutex > lock( g_imu_premutex );
     StatesGroup                    state_inout = state_in;
-    if ( CheckState( state_inout ) )
+    if ( CheckAbnormalState( state_inout ) )
     {
         state_inout.display( state_inout, "state_inout" );
         state_in.display( state_in, "state_in" );
@@ -253,7 +254,7 @@ StatesGroup ImuHandler::IMUPreintegration( const StatesGroup &state_in, std::deq
 
         acc_avr = acc_avr - state_inout.bias_a;
 
-        if ( tail->header.stamp.toSec() < state_inout.last_update_time )
+        if ( tail->header.stamp.toSec() < state_inout.lastUpdateTime )
         {
             continue;
         }
@@ -261,7 +262,7 @@ StatesGroup ImuHandler::IMUPreintegration( const StatesGroup &state_in, std::deq
         if ( if_first_imu )
         {
             if_first_imu = 0;
-            dt = tail->header.stamp.toSec() - state_inout.last_update_time;
+            dt = tail->header.stamp.toSec() - state_inout.lastUpdateTime;
         }
         else
         {
@@ -327,7 +328,7 @@ StatesGroup ImuHandler::IMUPreintegration( const StatesGroup &state_in, std::deq
     /*** calculated the pos and attitude prediction at the frame-end ***/
     dt = end_pose_dt;
 
-    state_inout.last_update_time = v_imu.back()->header.stamp.toSec() + dt;
+    state_inout.lastUpdateTime = v_imu.back()->header.stamp.toSec() + dt;
     // cout << "Last update time = " <<  state_inout.last_update_time - g_lidar_star_tim << endl;
     if ( dt > 0.1 )
     {
@@ -350,7 +351,7 @@ StatesGroup ImuHandler::IMUPreintegration( const StatesGroup &state_in, std::deq
     // check_state(state_inout);
     if ( 0 )
     {
-        if ( CheckState( state_inout ) )
+        if ( CheckAbnormalState( state_inout ) )
         {
             // printf_line;
             std::cout << __FILE__ << " " << __LINE__ << std::endl;
@@ -367,7 +368,7 @@ void ImuHandler::PointcloudUndistort( const MeasureGroup &meas, const StatesGrou
 {
     StatesGroup state_inout = _state_inout;
     auto        v_imu = meas.imu;
-    v_imu.push_front( last_imu_ );
+    v_imu.push_front( m_lastImu );
     const double &imu_end_time = v_imu.back()->header.stamp.toSec();
     const double &pcl_beg_time = meas.lidar_beg_time;
     /*** sort point clouds by offset time ***/
@@ -500,18 +501,18 @@ void ImuHandler::Process( MeasureGroup &meas, StatesGroup &stat, PointCloudXYZIN
     };
     ROS_ASSERT( meas.lidar != nullptr );
 
-    if ( imu_need_init_ )
+    if ( m_NeedInit )
     {
         /// The very first lidar frame
         IMUInitial( meas, stat, init_iter_num );
 
-        imu_need_init_ = true;
+        m_NeedInit = true;
 
-        last_imu_ = meas.imu.back();
+        m_lastImu = meas.imu.back();
 
         if ( init_iter_num > MAX_INI_COUNT )
         {
-            imu_need_init_ = false;
+            m_NeedInit = false;
             std::cout<<"mean acc: "<<mean_acc<<" acc measures in word frame:"<<stat.rot_end.transpose()*mean_acc<<std::endl;
             std::cout<<"mean acc normal: "<<mean_acc.norm()<<std::endl;
             ROS_INFO(
@@ -552,7 +553,7 @@ void ImuHandler::Process( MeasureGroup &meas, StatesGroup &stat, PointCloudXYZIN
     }
     // t2 = omp_get_wtime();
 
-    last_imu_ = meas.imu.back();
+    m_lastImu = meas.imu.back();
 
     // t3 = omp_get_wtime();
 

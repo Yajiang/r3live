@@ -18,19 +18,16 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/PointCloud2.h>
-// #include <fast_lio/States.h>
 #include <geometry_msgs/Vector3.h>
 
-/// *************Preconfiguration
 #define MAX_INI_COUNT (200)
 const inline bool time_list(PointType &x, PointType &y) {return (x.curvature < y.curvature);};
-bool CheckState(StatesGroup &state_inout);
+bool CheckAbnormalState(StatesGroup &state_inout);
 void CheckInOutState(const StatesGroup &state_in, StatesGroup &state_inout);
 float SigmoidPenalty(float x, float range);
 
 extern double g_imu_scale_factor;
 
-/// *************IMU Process and undistortion
 class ImuHandler
 {
  public:
@@ -51,7 +48,7 @@ class ImuHandler
   void UndistortPointcloud(const MeasureGroup &meas, StatesGroup &state_inout, PointCloudXYZINormal &pcl_in_out);
   void StatePropagate(const MeasureGroup &meas, StatesGroup &state_inout);
   void PointcloudUndistort(const MeasureGroup &meas,  const StatesGroup &state_inout, PointCloudXYZINormal &pcl_out);
-  StatesGroup IMUPreintegration(const StatesGroup & state_inout, std::deque<sensor_msgs::Imu::ConstPtr> & v_imu,  double end_pose_dt = 0);
+  StatesGroup imuPreintegration(const StatesGroup & state_inout, std::deque<sensor_msgs::Imu::ConstPtr> & v_imu,  double end_pose_dt = 0);
   ros::NodeHandle nh;
 
   void Integrate(const sensor_msgs::ImuConstPtr &imu);
@@ -69,8 +66,8 @@ class ImuHandler
 
  public:
   /*** Whether is the first frame, init for first frame ***/
-  bool b_first_frame_ = true;
-  bool imu_need_init_ = true;
+  bool m_IsFirstFrame = true;
+  bool m_NeedInit = true;
 
   int init_iter_num = 1;
   Eigen::Vector3d mean_acc;
@@ -80,10 +77,10 @@ class ImuHandler
   PointCloudXYZINormal::Ptr cur_pcl_un_;
 
   //// For timestamp usage
-  sensor_msgs::ImuConstPtr last_imu_;
+  sensor_msgs::ImuConstPtr m_lastImu;
 
   /*** For gyroscope integration ***/
-  double start_timestamp_;
+  double m_startTimestamp;
   /// Making sure the equal size: v_imu_ and v_rot_
   std::deque<sensor_msgs::ImuConstPtr> v_imu_;
   std::vector<Eigen::Matrix3d> v_rot_pcl_;

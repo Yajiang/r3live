@@ -27,6 +27,7 @@
 #include "tools_logger.hpp"
 #include <unistd.h>
 #include <visualization_msgs/Marker.h>
+#include "util/RPALogger.h"
 
 Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;
@@ -34,7 +35,8 @@ StatesGroup g_lio_state;
 
 int main(int argc, char **argv)
 {
-    printf_program("R3LIVE: A Robust, Real-time, RGB-colored, LiDAR-Inertial-Visual tightly-coupled state Estimation and mapping package");
+    // printf_program("R3LIVE: A Robust, Real-time, RGB-colored, LiDAR-Inertial-Visual tightly-coupled state Estimation and mapping package");
+    RPA_WARN("R3LIVE: A Robust, Real-time, RGB-colored, LiDAR-Inertial-Visual tightly-coupled state Estimation and mapping package");
     Common_tools::printf_software_version();
     Eigen::initParallel();
     ros::init(argc, argv, "R3LIVE_main");
