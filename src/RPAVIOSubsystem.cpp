@@ -1,8 +1,7 @@
-#include "r3live.hpp"
-// #include "photometric_error.hpp"
-#include "tools_mem_used.h"
-#include "tools_logger.hpp"
 #include "lib_sophus/so3.hpp"
+#include "r3live.hpp"
+#include "tools_logger.hpp"
+#include "tools_mem_used.h"
 
 Common_tools::Cost_time_logger              g_cost_time_logger;
 std::shared_ptr< Common_tools::ThreadPool > m_thread_pool_ptr;

@@ -31,14 +31,14 @@ float SigmoidPenalty(float x, float range);
 extern double g_imu_scale_factor;
 
 /// *************IMU Process and undistortion
-class ImuProcess
+class ImuHandler
 {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   float Scale_factor;
 
-  ImuProcess();
-  ~ImuProcess();
+  ImuHandler();
+  ~ImuHandler();
 
   void Process(MeasureGroup &meas, StatesGroup &state, PointCloudXYZINormal::Ptr pcl_un_);
   void Reset();

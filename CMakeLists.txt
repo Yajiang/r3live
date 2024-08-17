@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(r3live)
+project(revopoint_imu_fusion)
 
 # set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
@@ -79,23 +79,14 @@ message(STATUS "===== OpenCV ersion: ${OpenCV_VERSION}  =====")
 message(STATUS "===== OpenCV libraries: ${OpenCV_LIBS} =====")
 message(STATUS "===== OpenCV include path: ${OpenCV_INCLUDE_DIRS} =====")
 
-add_executable(r3live_LiDAR_front_end src/loam/LiDAR_front_end.cpp)
-target_link_libraries(r3live_LiDAR_front_end ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-if(Ceres_FOUND)
-  message(STATUS "===== Find ceres, Version ${Ceres_VERSION} =====")  
-  include_directories(${CERES_INCLUDE_DIRS})
-  add_executable(r3live_cam_cali src/r3live_cam_cali.cpp)
-  target_link_libraries(r3live_cam_cali ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${CERES_LIBRARIES})
+add_executable(revopoint_pointcloud_handler src/loam/RPAPointcloudHandler)
+target_link_libraries(revopoint_pointcloud_handler ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
-  add_executable(r3live_cam_cali_create_cali_board src/r3live_cam_cali_create_cali_board.cpp)
-  target_link_libraries(r3live_cam_cali_create_cali_board ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-endif()
-
-add_executable(r3live_mapping src/RPARos.cpp 
+add_executable(revopoint_mapping src/RPARosNode.cpp 
                 src/RPALIOSubsystem.cpp
                 src/kd_tree/ikd_Tree.cpp
                 src/FOV_Checker/RPAFOVChecker.cpp 
-                src/loam/RPAIMUProcessing.cpp
+                src/loam/RPAIMUHandler.cpp
                 # From VIO
                 src/RPAVIOSubsystem.cpp
                 src/optical_flow/lkpyramid.cpp
@@ -103,7 +94,7 @@ add_executable(r3live_mapping src/RPARos.cpp
                 src/rgb_map/RPAImageFrame.cpp
                 src/rgb_map/RPAPointcloudRgbd.cpp
               )
-target_link_libraries(r3live_mapping 
+target_link_libraries(revopoint_mapping 
                           ${catkin_LIBRARIES}
                           ${Boost_LIBRARIES}
                           ${Boost_FILESYSTEM_LIBRARY}

@@ -1,38 +1,36 @@
 #include "r3live.hpp"
 #include <pcl/registration/icp.h>
 
-void IMUFusion::imu_cbk( const sensor_msgs::Imu::ConstPtr &msg_in )
-{
-    sensor_msgs::Imu::Ptr msg( new sensor_msgs::Imu( *msg_in ) );
-    double                timestamp = msg->header.stamp.toSec();
-    g_camera_lidar_queue.imu_in( timestamp );
-    mtx_buffer.lock();
-    if ( timestamp < last_timestamp_imu )
-    {
-        ROS_ERROR( "imu loop back, clear buffer" );
-        imu_buffer_lio.clear();
-        imu_buffer_vio.clear();
-        flg_reset = true;
-    }
+void IMUFusion::imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in) {
+  sensor_msgs::Imu::Ptr msg(new sensor_msgs::Imu(*msg_in));
+  double timestamp = msg->header.stamp.toSec();
+  g_camera_lidar_queue.imu_in(timestamp);
+  mtx_buffer.lock();
+  if (timestamp < last_timestamp_imu) {
+    ROS_ERROR("imu loop back, clear buffer");
+    imu_buffer_lio.clear();
+    imu_buffer_vio.clear();
+    flg_reset = true;
+  }
 
-    last_timestamp_imu = timestamp;
+  last_timestamp_imu = timestamp;
 
-    if ( g_camera_lidar_queue.m_if_acc_mul_G )
-    {
-        msg->linear_acceleration.x *= G_m_s2;
-        msg->linear_acceleration.y *= G_m_s2;
-        msg->linear_acceleration.z *= G_m_s2;
-    }
+  if (g_camera_lidar_queue.m_if_acc_mul_G) {
+    msg->linear_acceleration.x *= G_m_s2;
+    msg->linear_acceleration.y *= G_m_s2;
+    msg->linear_acceleration.z *= G_m_s2;
+  }
 
-    // std::cout<<"imu data: "<< msg->linear_acceleration.x << " "
-    // << msg->linear_acceleration.y << " "
-    // << msg->linear_acceleration.z << " \n"
-    // << std::endl;
-    imu_buffer_lio.push_back( msg );
-    imu_buffer_vio.push_back( msg );
-    // std::cout<<"got imu: "<<timestamp<<" imu size "<<imu_buffer_lio.size()<<std::endl;
-    mtx_buffer.unlock();
-    sig_buffer.notify_all();
+  // std::cout<<"imu data: "<< msg->linear_acceleration.x << " "
+  // << msg->linear_acceleration.y << " "
+  // << msg->linear_acceleration.z << " \n"
+  // << std::endl;
+  imu_buffer_lio.emplace_back(msg);
+  imu_buffer_vio.emplace_back(msg);
+  // std::cout<<"got imu: "<<timestamp<<" imu size
+  // "<<imu_buffer_lio.size()<<std::endl;
+  mtx_buffer.unlock();
+  sig_buffer.notify_all();
 }
 
 void printf_field_name( sensor_msgs::PointCloud2::ConstPtr &msg )
@@ -478,7 +476,7 @@ int IMUFusion::service_LIO_update()
         featsArray[ i ].reset( new PointCloudXYZINormal() );
     }
 
-    std::shared_ptr< ImuProcess > p_imu( new ImuProcess() );
+    std::shared_ptr< ImuHandler > p_imu( new ImuHandler() );
     m_imu_process = p_imu;
     //------------------------------------------------------------------------------------------------------
     ros::Rate rate( 5000 );

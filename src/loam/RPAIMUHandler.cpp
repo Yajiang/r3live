@@ -19,7 +19,7 @@
 
 double g_lidar_star_tim = 0;
 double g_imu_scale_factor = 1.00352;
-ImuProcess::ImuProcess() : b_first_frame_( true ), imu_need_init_( true ), last_imu_( nullptr ), start_timestamp_( -1 )
+ImuHandler::ImuHandler() : b_first_frame_( true ), imu_need_init_( true ), last_imu_( nullptr ), start_timestamp_( -1 )
 {
     Eigen::Quaterniond q( 0, 1, 0, 0 );
     Eigen::Vector3d    t( 0, 0, 0 );
@@ -33,11 +33,11 @@ ImuProcess::ImuProcess() : b_first_frame_( true ), imu_need_init_( true ), last_
     // Lidar_offset_to_IMU = Eigen::Vector3d(0.0, 0.0, -0.0);
 }
 
-ImuProcess::~ImuProcess()
+ImuHandler::~ImuHandler()
 { /**fout.close();*/
 }
 
-void ImuProcess::Reset()
+void ImuHandler::Reset()
 {
     ROS_WARN( "Reset ImuProcess" );
     angvel_last = Zero3d;
@@ -61,7 +61,7 @@ void ImuProcess::Reset()
     cur_pcl_un_.reset( new PointCloudXYZINormal() );
 }
 
-void ImuProcess::IMUInitial( const MeasureGroup &meas, StatesGroup &state_inout, int &N )
+void ImuHandler::IMUInitial( const MeasureGroup &meas, StatesGroup &state_inout, int &N )
 {
     /** 1. initializing the gravity, gyro bias, acc and gyro covariance
      ** 2. normalize the acceleration measurenments to unit gravity **/
@@ -127,7 +127,7 @@ void ImuProcess::IMUInitial( const MeasureGroup &meas, StatesGroup &state_inout,
 
 }
 
-void ImuProcess::StatePropagate( const MeasureGroup &meas, StatesGroup &state_inout )
+void ImuHandler::StatePropagate( const MeasureGroup &meas, StatesGroup &state_inout )
 {
     /*** add the imu of the last frame-tail to the of current frame-head ***/
     auto v_imu = meas.imu;
@@ -213,7 +213,7 @@ void CheckInOutState( const StatesGroup &state_in, StatesGroup &state_inout )
 
 std::mutex g_imu_premutex;
 
-StatesGroup ImuProcess::IMUPreintegration( const StatesGroup &state_in, std::deque< sensor_msgs::Imu::ConstPtr > &v_imu, double end_pose_dt )
+StatesGroup ImuHandler::IMUPreintegration( const StatesGroup &state_in, std::deque< sensor_msgs::Imu::ConstPtr > &v_imu, double end_pose_dt )
 {
     std::unique_lock< std::mutex > lock( g_imu_premutex );
     StatesGroup                    state_inout = state_in;
@@ -363,7 +363,7 @@ StatesGroup ImuProcess::IMUPreintegration( const StatesGroup &state_in, std::deq
     return state_inout;
 }
 
-void ImuProcess::PointcloudUndistort( const MeasureGroup &meas, const StatesGroup &_state_inout, PointCloudXYZINormal &pcl_out )
+void ImuHandler::PointcloudUndistort( const MeasureGroup &meas, const StatesGroup &_state_inout, PointCloudXYZINormal &pcl_out )
 {
     StatesGroup state_inout = _state_inout;
     auto        v_imu = meas.imu;
@@ -487,7 +487,7 @@ void ImuProcess::PointcloudUndistort( const MeasureGroup &meas, const StatesGrou
     }
 }
 
-void ImuProcess::Process( MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_ )
+void ImuHandler::Process( MeasureGroup &meas, StatesGroup &stat, PointCloudXYZINormal::Ptr cur_pcl_un_ )
 {
     // double t1, t2, t3;
     // t1 = omp_get_wtime();

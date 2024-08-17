@@ -40,22 +40,22 @@ using eigen_mat = eigen_mat_d< M, N >;
 template < int M >
 using eigen_vec = eigen_vec_d< M >;
 
-typedef eigen_vec< 2 >                                                                 vec_2;
-typedef eigen_vec< 3 >                                                                 vec_3;
-typedef eigen_vec< 4 >                                                                 vec_4;
-typedef eigen_vec< 6 >                                                                 vec_6;
-typedef eigen_vec< 7 >                                                                 vec_7;
-typedef eigen_vec< 12 >                                                                vec_12;
-typedef eigen_mat< 3, 3 >                                                              mat_3_3;
-typedef eigen_mat< 4, 4 >                                                              mat_4_4;
-typedef eigen_mat< 6, 6 >                                                              mat_6_6;
-typedef eigen_mat< 12, 12 >                                                            mat_12;
-typedef eigen_mat< 6, 12 >                                                             mat_6_12;
-typedef eigen_mat< 12, 6 >                                                             mat_12_6;
-typedef eigen_angleaxis_t< double >                                                    eigen_angleaxis;
-typedef Eigen::Quaternion< double, EIGEN_DATA_TYPE_DEFAULT_OPTION >                    eigen_q;
-typedef Eigen::Transform< double, 3, Eigen::Isometry, EIGEN_DATA_TYPE_DEFAULT_OPTION > eigen_pose;
-typedef std::vector< eigen_q >                                                         eigen_q_vec;
+using vec_2 = eigen_vec<2>;
+using vec_3 = eigen_vec<3>;
+using vec_4 = eigen_vec<4>;
+using vec_6 = eigen_vec<6>;
+using vec_7 = eigen_vec<7>;
+using vec_12 = eigen_vec<12>;
+using mat_3_3 = eigen_mat<3, 3>;
+using mat_4_4 = eigen_mat<4, 4>;
+using mat_6_6 = eigen_mat<6, 6>;
+using mat_12 = eigen_mat<12, 12>;
+using mat_6_12 = eigen_mat<6, 12>;
+using mat_12_6 = eigen_mat<12, 6>;
+using eigen_angleaxis = eigen_angleaxis_t<double>;
+using eigen_q = Eigen::Quaternion<double, Eigen::DontAlign>;
+using eigen_pose = Eigen::Transform<double, 3, Eigen::Isometry, Eigen::DontAlign>;
+using eigen_q_vec = std::vector<eigen_q>;
 
 // namespace Common_tools
 // {

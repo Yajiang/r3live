@@ -1,32 +1,32 @@
-#include <omp.h>
-#include <math.h>
-#include <csignal>
-#include <unistd.h>
-#include <so3_math.h>
-#include <ros/ros.h>
 #include <Eigen/Core>
-#include <opencv2/opencv.hpp>
+#include <FOV_Checker/RPAFOVChecker.h>
 #include <common_lib.h>
+#include <csignal>
+#include <geometry_msgs/Vector3.h>
 #include <kd_tree/ikd_Tree.h>
+#include <math.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
+#include <omp.h>
 #include <opencv2/core/eigen.hpp>
-#include <visualization_msgs/Marker.h>
-#include <pcl_conversions/pcl_conversions.h>
+#include <opencv2/opencv.hpp>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/io/pcd_io.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <tf/transform_datatypes.h>
+
+#include <so3_math.h>
 #include <tf/transform_broadcaster.h>
-#include <geometry_msgs/Vector3.h>
-#include <FOV_Checker/RPAFOVChecker.h>
+#include <tf/transform_datatypes.h>
 
 #include "r3live.hpp"
-
 #include "tools_logger.hpp"
+#include <unistd.h>
+#include <visualization_msgs/Marker.h>
 
 Camera_Lidar_queue g_camera_lidar_queue;
 MeasureGroup Measures;

@@ -1,48 +1,43 @@
 #pragma once
-#include <omp.h>
-#include <mutex>
-#include <math.h>
-#include <thread>
-#include <csignal>
-#include <unistd.h>
-#include <so3_math.h>
-#include <ros/ros.h>
-#include <Eigen/Core>
-#include <opencv2/opencv.hpp>
-#include <common_lib.h>
-#include <kd_tree/ikd_Tree.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
-#include <opencv2/core/eigen.hpp>
-#include <visualization_msgs/Marker.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/io/pcd_io.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <tf/transform_datatypes.h>
-#include <tf/transform_broadcaster.h>
-
-#include <geometry_msgs/Vector3.h>
-#include <FOV_Checker/RPAFOVChecker.h>
-
-#include <opencv2/highgui/highgui.hpp>
-#include <cv_bridge/cv_bridge.h>
-
-#include "tools_logger.hpp"
-#include "tools_color_printf.hpp"
-#include "tools_eigen.hpp"
-#include "tools_timer.hpp"
-#include "tools_thread_pool.hpp"
-#include "tools_ros.hpp"
-
-#include "loam/RPAIMUProcessing.hpp"
-
+#include "RPAColorMapTracker.hpp"
 #include "RPAImageFrame.hpp"
 #include "RPAPointcloudRgbd.hpp"
-#include "RPAColorMapTracker.hpp"
+#include "loam/RPAIMUProcessing.hpp"
+#include "tools_color_printf.hpp"
+#include "tools_eigen.hpp"
+#include "tools_logger.hpp"
+#include "tools_ros.hpp"
+#include "tools_thread_pool.hpp"
+#include "tools_timer.hpp"
+#include <Eigen/Core>
+#include <FOV_Checker/RPAFOVChecker.h>
+#include <common_lib.h>
+#include <csignal>
+#include <cv_bridge/cv_bridge.h>
+#include <geometry_msgs/Vector3.h>
+#include <kd_tree/ikd_Tree.h>
+#include <math.h>
+#include <mutex>
+#include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
+#include <omp.h>
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <so3_math.h>
+#include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
+#include <thread>
+#include <unistd.h>
+#include <visualization_msgs/Marker.h>
 
 #define THREAD_SLEEP_TIM 1
 
@@ -62,7 +57,7 @@ const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth;
 extern Camera_Lidar_queue g_camera_lidar_queue;
 extern MeasureGroup Measures;
 extern StatesGroup g_lio_state;
-extern std::shared_ptr<ImuProcess> g_imu_process;
+extern std::shared_ptr<ImuHandler> g_imu_process;
 extern double g_lidar_star_tim;
 
 extern double g_vio_frame_cost_time;
@@ -77,7 +72,7 @@ class IMUFusion
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     std::mutex  m_mutex_lio_process;
-    std::shared_ptr<ImuProcess> m_imu_process;
+    std::shared_ptr<ImuHandler> m_imu_process;
     std::string root_dir = ROOT_DIR;
     FILE * m_lio_state_fp;
     FILE * m_lio_costtime_fp;
@@ -143,7 +138,7 @@ public:
     int laserCloudValidInd[laserCloudNum];
     pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudFullResColor; //(new pcl::PointCloud<pcl::PointXYZI>());
 
-    KD_TREE ikdtree;
+    KDTree ikdtree;
 
     ros::Publisher pubLaserCloudFullRes;
     ros::Publisher pubLaserCloudEffect;
