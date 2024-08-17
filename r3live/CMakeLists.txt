@@ -11,7 +11,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
 
 # Add OpenCV if available
-# set(OpenCV_DIR "/home/zivlin/opt/opencv/build")
 FIND_PACKAGE(Boost REQUIRED COMPONENTS filesystem iostreams program_options system serialization)
 if(Boost_FOUND)
 	INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
@@ -25,7 +24,6 @@ find_package(catkin REQUIRED COMPONENTS
                     nav_msgs
                     tf
                     cv_bridge
-                    livox_ros_driver
             )
 
 # find_package(Ceres REQUIRED)
@@ -49,14 +47,7 @@ else()
 	message("-- Can't find OpenMP. Continuing without it.")
 endif()
 
-# find_package(OpenMVS)
-if(OpenMVS_FOUND)
-	include_directories(${OpenMVS_INCLUDE_DIRS})
-	add_definitions(${OpenMVS_DEFINITIONS})
-endif()
-
 # message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
-
 include_directories(${catkin_INCLUDE_DIRS})
 
 generate_messages(
@@ -70,12 +61,14 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}
-  ${livox_ros_driver_INCLUDE_DIRS}
-  ./src
-  ./src/loam/include
-  ./src/tools/
-  ./src/rgb_map 
-  ./src/meshing
+  ./inc/FOV_Checker
+  ./inc/kd_tree
+  ./inc/lib_sophus
+  ./inc/loam
+  ./inc/optical_flow
+  ./inc/rgb_map
+  ./inc/tools
+  ./inc
 )
 
 
@@ -97,20 +90,18 @@ if(Ceres_FOUND)
   add_executable(r3live_cam_cali_create_cali_board src/r3live_cam_cali_create_cali_board.cpp)
   target_link_libraries(r3live_cam_cali_create_cali_board ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 endif()
-add_executable(test_timer src/tools/test_timer.cpp)
 
-add_executable(r3live_mapping src/r3live.cpp 
-                src/r3live_lio.cpp
-                src/loam/include/kd_tree/ikd_Tree.cpp
-                src/loam/include/FOV_Checker/FOV_Checker.cpp 
-                src/loam/IMU_Processing.cpp
-                src/rgb_map/offline_map_recorder.cpp
+add_executable(r3live_mapping src/RPARos.cpp 
+                src/RPALIOSubsystem.cpp
+                src/kd_tree/ikd_Tree.cpp
+                src/FOV_Checker/RPAFOVChecker.cpp 
+                src/loam/RPAIMUProcessing.cpp
                 # From VIO
-                src/r3live_vio.cpp
+                src/RPAVIOSubsystem.cpp
                 src/optical_flow/lkpyramid.cpp
-                src/rgb_map/rgbmap_tracker.cpp
-                src/rgb_map/image_frame.cpp
-                src/rgb_map/pointcloud_rgbd.cpp
+                src/rgb_map/RPAColorMapTracker.cpp
+                src/rgb_map/RPAImageFrame.cpp
+                src/rgb_map/RPAPointcloudRgbd.cpp
               )
 target_link_libraries(r3live_mapping 
                           ${catkin_LIBRARIES}
@@ -118,48 +109,6 @@ target_link_libraries(r3live_mapping
                           ${Boost_FILESYSTEM_LIBRARY}
                           ${Boost_SERIALIZATION_LIBRARY} # serialization
                           ${OpenCV_LIBRARIES}
-                          # ${OpenMVS_LIBRARIES}
+                          ${PCL_LIBRARIES}
                           pcl_common 
                           pcl_io) 
-
-# FIND_PACKAGE(CGAL REQUIRED)
-# if(CGAL_FOUND)
-# 	include_directories(${CGAL_INCLUDE_DIRS})
-# 	add_definitions(${CGAL_DEFINITIONS})
-# 	link_directories(${CGAL_LIBRARY_DIRS})
-#   ADD_DEFINITIONS(-D_USE_BOOST -D_USE_EIGEN -D_USE_OPENMP)
-#   SET(_USE_BOOST TRUE)
-#   SET(_USE_OPENMP TRUE)
-#   SET(_USE_EIGEN TRUE)
-#   add_executable(r3live_meshing src/r3live_reconstruct_mesh.cpp                              
-#                                 src/rgb_map/image_frame.cpp
-#                                 src/rgb_map/pointcloud_rgbd.cpp  
-#                                 # Common
-#                                 src/meshing/MVS/Common/Common.cpp
-#                                 src/meshing/MVS/Common/Log.cpp
-#                                 src/meshing/MVS/Common/Timer.cpp
-#                                 src/meshing/MVS/Common/Types.cpp
-#                                 src/meshing/MVS/Common/Util.cpp
-#                                 # MVS                       
-#                                 src/meshing/MVS/Mesh.cpp
-#                                 src/meshing/MVS/PointCloud.cpp
-#                                 src/meshing/MVS/Camera.cpp
-#                                 src/meshing/MVS/Platform.cpp
-#                                 src/meshing/MVS/PLY.cpp
-#                                 src/meshing/MVS/OBJ.cpp
-#                                 src/meshing/MVS/IBFS.cpp
-#                                 )
-# target_link_libraries(r3live_meshing 
-#                                   ${catkin_LIBRARIES}
-#                                   ${Boost_LIBRARIES}
-#                                   ${Boost_FILESYSTEM_LIBRARY}
-#                                   ${Boost_SERIALIZATION_LIBRARY} # serialization
-#                                   ${CGAL_LIBS}
-#                                   ${OpenCV_LIBRARIES}
-#                                   ${JPEG_LIBRARIES} 
-#                                   gmp
-#                                   pcl_common 
-#                                   pcl_io
-#                                   pcl_kdtree)
-
-# endif()
