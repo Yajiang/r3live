@@ -34,7 +34,7 @@ ImuHandler::ImuHandler() : b_first_frame_( true ), imu_need_init_( true ), last_
 }
 
 ImuHandler::~ImuHandler()
-{ /**fout.close();*/
+{
 }
 
 void ImuHandler::Reset()

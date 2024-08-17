@@ -251,7 +251,7 @@ public:
     
     void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in);
 
-    bool sync_packages(MeasureGroup &meas);
+    bool syncPackages(MeasureGroup &meas);
     
     IMUFusion()
     {
@@ -384,7 +384,7 @@ public:
     void lasermap_fov_segment();
     void feat_points_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg_in);
     void wait_render_thread_finish();
-    bool get_pointcloud_data_from_ros_message(sensor_msgs::PointCloud2::ConstPtr & msg, pcl::PointCloud<pcl::PointXYZINormal> & pcl_pc);
+    bool getPointcloudFromROS(sensor_msgs::PointCloud2::ConstPtr & msg, pcl::PointCloud<pcl::PointXYZINormal> & pcl_pc);
     int service_LIO_update();
     void publish_render_pts( ros::Publisher &pts_pub, GlobalMap &m_map_rgb_pts );
     void print_dash_board();

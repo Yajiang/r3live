@@ -1,4 +1,4 @@
-#include "r3live.hpp"
+#include "RPAIMUFusion.hpp"
 #include <pcl/registration/icp.h>
 
 void IMUFusion::imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in) {
@@ -44,7 +44,7 @@ void printf_field_name( sensor_msgs::PointCloud2::ConstPtr &msg )
 }
 
 
-bool IMUFusion::get_pointcloud_data_from_ros_message( sensor_msgs::PointCloud2::ConstPtr &msg, pcl::PointCloud< pcl::PointXYZINormal > &pcl_pc )
+bool IMUFusion::getPointcloudFromROS( sensor_msgs::PointCloud2::ConstPtr &msg, pcl::PointCloud< pcl::PointXYZINormal > &pcl_pc )
 {
 
     // printf("Frame [%d] %.3f ", g_LiDAR_frame_index,  msg->header.stamp.toSec() - g_camera_lidar_queue.m_first_imu_time);
@@ -104,7 +104,7 @@ bool IMUFusion::get_pointcloud_data_from_ros_message( sensor_msgs::PointCloud2::
     }
 }
 
-bool IMUFusion::sync_packages( MeasureGroup &meas )
+bool IMUFusion::syncPackages( MeasureGroup &meas )
 {
     if ( lidar_buffer.empty() || imu_buffer_lio.empty() )
     {
@@ -115,7 +115,7 @@ bool IMUFusion::sync_packages( MeasureGroup &meas )
     if ( !lidar_pushed )
     {
         meas.lidar.reset( new PointCloudXYZINormal() );
-        if ( get_pointcloud_data_from_ros_message( lidar_buffer.front(), *( meas.lidar ) ) == false )
+        if ( getPointcloudFromROS( lidar_buffer.front(), *( meas.lidar ) ) == false )
         {
             return false;
         }
@@ -503,7 +503,7 @@ int IMUFusion::service_LIO_update()
         {
             // printf_line;
             Common_tools::Timer tim;
-            if ( sync_packages( Measures ) == 0 )
+            if ( syncPackages( Measures ) == 0 )
             {
                 continue;
             }
